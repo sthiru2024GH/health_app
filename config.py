@@ -7,20 +7,20 @@ INSTANCE_DIR = os.path.join(BASE_DIR, "instance")
 os.makedirs(INSTANCE_DIR, exist_ok=True)
 
 
-class Config:
-    SECRET_KEY = os.environ.get("SECRET_KEY", "dev-key-change-in-production")
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
-        "DATABASE_URL", f"sqlite:///{os.path.join(INSTANCE_DIR, 'health_app.db')}"
-    )
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
+import os
 
-    # Fix Render's legacy 'postgres://' prefix for SQLAlchemy compatibility
-    if SQLALCHEMY_DATABASE_URI and SQLALCHEMY_DATABASE_URI.startswith(
-        "postgres://"
-    ):
-        SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI.replace(
-            "postgres://", "postgresql://", 1
-        )
+class Config:
+    # Get DATABASE_URL from environment
+    db_url = os.environ.get('DATABASE_URL', 'sqlite:///app.db')
+    
+    # Fix Render's legacy 'postgres://' prefix & specify psycopg2 driver
+    if db_url and db_url.startswith('postgres://'):
+        db_url = db_url.replace('postgres://', 'postgresql+psycopg2://', 1)
+    elif db_url and db_url.startswith('postgresql://'):
+        db_url = db_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
+
+    SQLALCHEMY_DATABASE_URI = db_url
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 
 class DevelopmentConfig(Config):
