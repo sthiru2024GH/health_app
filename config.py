@@ -10,6 +10,8 @@ os.makedirs(INSTANCE_DIR, exist_ok=True)
 import os
 
 class Config:
+    SECRET_KEY = os.environ.get('SECRET_KEY', 'super-secret-health-app-key')
+
     # Get DATABASE_URL from environment
     db_url = os.environ.get('DATABASE_URL', 'sqlite:///app.db')
     

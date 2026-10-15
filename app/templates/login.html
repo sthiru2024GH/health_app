@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Login - HealthApp{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 400px; margin: 4rem auto;">
+    <h2 class="card-title text-center">Welcome Back</h2>
+    
+    <div id="errorMsg" style="color: var(--danger-color); margin-bottom: 1rem; text-align: center; display: none;"></div>
+    
+    <form id="loginForm">
+        <div class="form-group">
+            <label class="form-label" for="username">Username</label>
+            <input type="text" id="username" class="form-control" required>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" for="password">Password</label>
+            <input type="password" id="password" class="form-control" required>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="captcha_answer" id="captchaQuestion">{{ captcha_question }}</label>
+            <input type="text" id="captcha_answer" class="form-control" inputmode="numeric" autocomplete="off" required>
+            <button type="button" id="refreshCaptcha" class="btn btn-outline" style="margin-top: 0.5rem;">New question</button>
+        </div>
+        
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Log In</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const captchaAnswer = document.getElementById('captcha_answer').value;
+        const errorMsg = document.getElementById('errorMsg');
+        
+        try {
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password, captcha_answer: captchaAnswer })
+            });
+
+            const data = await res.json();
+            if (data.captcha_question) {
+                document.getElementById('captchaQuestion').textContent = data.captcha_question;
+                document.getElementById('captcha_answer').value = '';
+            }
+
+            if (res.ok) {
+                window.location.href = '/dashboard';
+            } else {
+                errorMsg.textContent = data.error || 'Login failed';
+                errorMsg.style.display = 'block';
+            }
+        } catch (err) {
+            errorMsg.textContent = 'Network error occurred';
+            errorMsg.style.display = 'block';
+        }
+    });
+
+    document.getElementById('refreshCaptcha').addEventListener('click', async () => {
+        const errorMsg = document.getElementById('errorMsg');
+        try {
+            const res = await fetch('/api/auth/captcha');
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Unable to refresh CAPTCHA');
+            }
+
+            document.getElementById('captchaQuestion').textContent = data.captcha_question;
+            document.getElementById('captcha_answer').value = '';
+            errorMsg.style.display = 'none';
+        } catch (err) {
+            errorMsg.textContent = 'Unable to refresh CAPTCHA. Please try again.';
+            errorMsg.style.display = 'block';
+        }
+    });
+</script>
+{% endblock %}

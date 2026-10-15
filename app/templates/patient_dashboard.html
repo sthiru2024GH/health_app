@@ -1,0 +1,1585 @@
+{% extends "base.html" %}
+
+{% block title %}Patient Dashboard - HealthApp{% endblock %}
+
+{% block content %}
+<div class="dashboard-header" style="align-items: center;">
+    <h2>My Dashboard</h2>
+</div>
+
+<div class="tab-menu">
+    <button type="button" class="tab-btn" onclick="switchTab('symptomsTab', this)">Symptoms</button>
+    <button type="button" class="tab-btn" onclick="switchTab('prescriptionsTab', this)">Prescriptions</button>
+    <button type="button" class="tab-btn" onclick="switchTab('dashboardHome', this)">Medications</button>
+    <button type="button" class="tab-btn" onclick="switchTab('interventionsTab', this)">Interventions</button>
+    <button type="button" class="tab-btn" onclick="switchTab('vitalsTab', this)">Vitals</button>
+    <button type="button" class="tab-btn" onclick="switchTab('labsTab', this)">Lab Tests</button>
+    <button type="button" class="tab-btn" onclick="switchTab('analyticsTab', this)">Analytics</button>
+    <button type="button" class="tab-btn" onclick="switchTab('advancedAnalyticsTab', this)">Advanced Analytics</button>
+</div>
+
+<div id="dashboardHome">
+<div class="card">
+    <h3 class="card-title">Today's Medication Schedule</h3>
+    <div id="medsList" style="max-height:32rem; overflow-y:auto; padding-right:0.5rem;">
+        <p class="text-muted">Loading schedules...</p>
+    </div>
+</div>
+
+<div class="card" style="margin-top:1rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
+        <h3 class="card-title" style="margin:0;">Medication Log</h3>
+        <label class="form-label" for="medicationLogDate" style="display:flex; align-items:center; gap:0.5rem; margin:0;">
+            View date
+            <input type="date" id="medicationLogDate" class="form-control" style="width:auto;">
+        </label>
+    </div>
+    <div id="medicationLog">
+        <p class="text-muted">Select a date to view medication history.</p>
+    </div>
+</div>
+ </div>
+
+<!-- SYMPTOMS TAB -->
+<div id="symptomsTab" class="tab-content">
+    <div class="card">
+        <h3 class="card-title">Record Symptoms</h3>
+        <div id="symptomFormError" role="alert" style="display:none; color:var(--danger-color); margin-bottom:1rem;"></div>
+        <form id="symptomForm">
+            <div class="grid-2" style="gap:1rem;">
+                <div class="form-group">
+                    <label class="form-label" for="symptomRecordedAt">Date and time</label>
+                    <input type="datetime-local" id="symptomRecordedAt" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="symptomSeverity">Severity</label>
+                    <select id="symptomSeverity" class="form-control" required>
+                        <option value="">Select severity...</option>
+                        <option value="mild">Mild</option>
+                        <option value="moderate">Moderate</option>
+                        <option value="major">Major</option>
+                        <option value="critical">Critical</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="symptomDescription">Symptoms</label>
+                <textarea id="symptomDescription" class="form-control" rows="4" placeholder="Describe the symptoms..." required></textarea>
+            </div>
+            <div style="display:flex; justify-content:flex-end;">
+                <button type="submit" class="btn btn-primary">Save Symptoms</button>
+            </div>
+        </form>
+    </div>
+    <div class="card" style="margin-top:1rem;">
+        <h3 class="card-title">Symptom History</h3>
+        <div id="symptomsList"><p class="text-muted">Loading symptoms...</p></div>
+    </div>
+</div>
+
+<!-- PRESCRIPTIONS TAB -->
+<div id="prescriptionsTab" class="tab-content">
+    <div style="display:flex; justify-content:flex-end; gap:1rem; margin-bottom:1rem;">
+        <button class="btn btn-outline" onclick="openPractitionerModal()">+ Add Practitioner</button>
+        <button class="btn btn-primary" onclick="openPrescriptionModal()">+ Add Prescription</button>
+    </div>
+    <div class="grid-2 mb-4" style="gap:1rem;">
+        <div class="card">
+            <h3 class="card-title">My Practitioners</h3>
+            <div id="practitionersList"><p class="text-muted">Loading...</p></div>
+        </div>
+        <div class="card">
+            <h3 class="card-title">My Prescriptions</h3>
+            <div id="prescriptionsList"><p class="text-muted">Loading...</p></div>
+        </div>
+    </div>
+</div>
+
+<!-- INTERVENTIONS TAB -->
+<div id="interventionsTab" class="tab-content">
+    <div style="display:flex; justify-content:flex-end; gap:1rem; margin-bottom:1rem;">
+        <div>
+            <label class="form-label" for="interventionMethod" style="margin-bottom:0.25rem;">Add Interventions</label>
+            <select id="interventionMethod" class="form-control" aria-label="Add Interventions method" onchange="openInterventionForm(this.value)">
+                <option value="">Select method...</option>
+                <option value="medication">Medication</option>
+                <option value="surgery">Surgery</option>
+                <option value="procedure">Procedure</option>
+                <option value="others">Others</option>
+            </select>
+        </div>
+    </div>
+    <div class="card">
+        <h3 class="card-title">Intervention Log</h3>
+        <div id="interventionsList"><p class="text-muted">Loading interventions...</p></div>
+    </div>
+</div>
+
+<!-- VITALS TAB -->
+<div id="vitalsTab" class="tab-content">
+    <div style="display:flex; justify-content:flex-end; margin-bottom: 1rem;">
+        <button class="btn btn-primary" onclick="openVitalsModal()">+ Log Vitals</button>
+    </div>
+    <div class="grid-3 mb-4">
+        <div class="card stat-card">
+            <div class="stat-value" id="lastBp">--/--</div>
+            <div class="stat-label">Last Blood Pressure</div>
+        </div>
+        <div class="card stat-card">
+            <div class="stat-value" id="lastHr">--</div>
+            <div class="stat-label">Last Heart Rate</div>
+        </div>
+        <div class="card stat-card">
+            <div class="stat-value" id="lastSugar">--</div>
+            <div class="stat-label">Last Blood Sugar</div>
+        </div>
+    </div>
+    <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
+            <h3 class="card-title" style="margin:0;">Recent Vitals</h3>
+            <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+                <label class="form-label" for="vitalsStartDate" style="display:flex; align-items:center; gap:0.5rem; margin:0;">
+                    From
+                    <input type="date" id="vitalsStartDate" class="form-control" style="width:auto;">
+                </label>
+                <label class="form-label" for="vitalsEndDate" style="display:flex; align-items:center; gap:0.5rem; margin:0;">
+                    To
+                    <input type="date" id="vitalsEndDate" class="form-control" style="width:auto;">
+                </label>
+            </div>
+        </div>
+        <div id="vitalsHistory">
+            <p class="text-muted">Loading history...</p>
+        </div>
+    </div>
+</div>
+
+<!-- LAB TESTS TAB -->
+<div id="labsTab" class="tab-content">
+    <div style="display:flex; justify-content:flex-end; margin-bottom: 1rem;">
+        <button class="btn btn-outline" onclick="openLabModal()">+ Log Lab Test</button>
+    </div>
+    <div class="card mb-4">
+        <h3 class="card-title">Lab Test Reports</h3>
+        <div id="labsHistory">
+            <p class="text-muted">Loading lab reports...</p>
+        </div>
+    </div>
+</div>
+
+<!-- ANALYTICS TAB -->
+<div id="analyticsTab" class="tab-content">
+    <div class="card mb-4">
+        <h3 class="card-title">Vitals Trend</h3>
+        <canvas id="vitalsChart" width="400" height="150"></canvas>
+    </div>
+
+    <div class="card mb-4">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1rem;">
+            <h3 class="card-title" style="margin:0;">Lab Test Trend</h3>
+            <select id="labChartParamSelect" class="form-control" style="width: 200px;" onchange="renderLabsChart()">
+                <option value="">Select a parameter...</option>
+            </select>
+        </div>
+        <canvas id="labsChart" width="400" height="150"></canvas>
+    </div>
+</div>
+
+<div id="advancedAnalyticsTab" class="tab-content">
+    <div class="card">
+        <h3 class="card-title">Advanced Analytics</h3>
+        <p class="text-muted">Coming soon</p>
+    </div>
+</div>
+
+<!-- Simple inline modal for logging vitals -->
+<div id="vitalsModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;">
+    <div class="card" style="max-width:400px; margin: 10% auto; position:relative;">
+        <h3 class="card-title">Log Vitals</h3>
+        <form id="vitalsForm">
+            <div class="grid-2" style="gap: 1rem; margin-bottom: 0;">
+                <div class="form-group">
+                    <label class="form-label">Systolic BP</label>
+                    <input type="number" id="sysBp" class="form-control" placeholder="120">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Diastolic BP</label>
+                    <input type="number" id="diaBp" class="form-control" placeholder="80">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Heart Rate</label>
+                <input type="number" id="hr" class="form-control" placeholder="72">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Blood Sugar</label>
+                <input type="number" step="0.1" id="sugar" class="form-control" placeholder="95.5">
+            </div>
+            
+            <div class="form-group" style="margin-top: 1rem;">
+                <label class="form-label">Recorded At</label>
+                <input type="datetime-local" id="recordedAt" class="form-control">
+            </div>
+            
+            <div style="display:flex; justify-content:flex-end; gap:1rem; margin-top:2rem;">
+                <button type="button" class="btn btn-outline" onclick="closeVitalsModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Log</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Detailed View Modal -->
+<div id="vitalDetailModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;">
+    <div class="card" style="max-width:400px; margin: 15% auto; position:relative;">
+        <h3 class="card-title">Vital Record Details</h3>
+        <div id="vitalDetailContent" style="margin-bottom: 2rem;">
+            <!-- content populated by JS -->
+        </div>
+        <div style="display:flex; justify-content:flex-end;">
+            <button type="button" class="btn btn-outline" onclick="closeVitalDetailModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Log Lab Modal -->
+<div id="labModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
+    <div class="card" style="max-width:500px; margin: 5% auto; position:relative;">
+        <h3 class="card-title">Log Lab Test</h3>
+        <form id="labForm">
+            <div class="form-group">
+                <label class="form-label">Test Name (e.g., Lipid Profile)</label>
+                <input type="text" id="labTestName" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Recorded At</label>
+                <input type="datetime-local" id="labRecordedAt" class="form-control">
+            </div>
+            
+            <datalist id="paramNamesList">
+                <!-- Populated by JS -->
+            </datalist>
+
+            <h4 style="margin: 1.5rem 0 0.5rem 0;">Parameters</h4>
+            <div id="labParamsContainer">
+                <div class="grid-3 lab-param-row" style="margin-bottom: 0.5rem; gap:0.5rem;">
+                    <input type="text" class="form-control param-name" list="paramNamesList" placeholder="Name (e.g., LDL)">
+                    <input type="number" step="0.01" class="form-control param-value" placeholder="Value">
+                    <input type="text" class="form-control param-unit" placeholder="Unit (e.g., mg/dL)">
+                </div>
+            </div>
+            <button type="button" class="btn btn-outline" style="padding:0.25rem 0.5rem; font-size:0.875rem;" onclick="addLabParamRow()">+ Add Parameter</button>
+            
+            <div style="display:flex; justify-content:flex-end; gap:1rem; margin-top:2rem;">
+                <button type="button" class="btn btn-outline" onclick="closeLabModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Report</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Practitioner Modal -->
+<div id="practitionerModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;">
+    <div class="card" style="max-width:400px; margin: 10% auto; position:relative;">
+        <h3 class="card-title">Add Practitioner</h3>
+        <form id="practitionerForm">
+            <div class="form-group">
+                <label class="form-label">Name</label>
+                <input type="text" id="pracName" class="form-control" required placeholder="Dr. Smith">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Specialization</label>
+                <input type="text" id="pracSpec" class="form-control" placeholder="e.g. Cardiologist">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Medical Practice</label>
+                <select id="pracPractice" class="form-control">
+                    <option value="Allopathy">Allopathy</option>
+                    <option value="Homeopathy">Homeopathy</option>
+                    <option value="Ayurvedic">Ayurvedic</option>
+                </select>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:1rem; margin-top:2rem;">
+                <button type="button" class="btn btn-outline" onclick="closePractitionerModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Practitioner</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Prescription Modal -->
+<div id="prescriptionModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
+    <div class="card" style="max-width:600px; margin: 5% auto; position:relative;">
+        <h3 class="card-title" id="prescriptionModalTitle">Add Prescription</h3>
+        <form id="prescriptionForm">
+            <input type="hidden" id="prescId">
+            <div id="prescriptionFormError" role="alert" style="display:none; color:var(--danger-color); margin-bottom:1rem;"></div>
+            <div class="grid-2" style="gap:1rem;">
+                <div class="form-group">
+                    <label class="form-label">Practitioner</label>
+                    <select id="prescPractitioner" class="form-control" required>
+                        <option value="">Select Practitioner...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date Issued</label>
+                    <input type="date" id="prescDate" class="form-control" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Notes</label>
+                <input type="text" id="prescNotes" class="form-control" placeholder="Optional notes...">
+            </div>
+
+            <h4 style="margin: 1.5rem 0 0.5rem 0;">Medications</h4>
+            <div id="prescItemsContainer">
+                <div class="grid-4 presc-item-row" style="margin-bottom: 0.5rem; gap:0.5rem; align-items:center;">
+                    <input type="text" class="form-control item-drug" placeholder="Drug Name" required>
+                    <input type="number" step="0.1" class="form-control item-qty" placeholder="Qty (e.g. 1)" required>
+                    <input type="text" class="form-control item-unit" placeholder="Unit (e.g. pills)" required>
+                    <input type="time" class="form-control item-time" required>
+                    <select class="form-control item-event" style="grid-column: span 4;">
+                        <option value="Independent">Independent of Meal</option>
+                        <option value="Before Meal">Before Meal</option>
+                        <option value="After Meal">After Meal</option>
+                    </select>
+                </div>
+            </div>
+            <button type="button" class="btn btn-outline" style="padding:0.25rem 0.5rem; font-size:0.875rem;" onclick="addPrescItemRow()">+ Add Medication</button>
+            
+            <div style="display:flex; justify-content:flex-end; gap:1rem; margin-top:2rem;">
+                <button type="button" class="btn btn-outline" onclick="closePrescriptionModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Prescription</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="interventionModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
+    <div class="card" style="max-width:600px; margin:5% auto;">
+        <h3 class="card-title">Add Intervention</h3>
+        <div id="interventionFormError" role="alert" style="display:none; color:var(--danger-color); margin-bottom:1rem;"></div>
+        <form id="interventionForm">
+            <div class="form-group">
+                <label class="form-label" for="interventionPractitioner">Practitioner</label>
+                <select id="interventionPractitioner" class="form-control" required>
+                    <option value="">Select practitioner...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="interventionSymptom">Symptom</label>
+                <select id="interventionSymptom" class="form-control" required>
+                    <option value="">Select symptom...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="interventionMethodType">Method</label>
+                <select id="interventionMethodType" class="form-control" required onchange="updateInterventionFields()">
+                    <option value="medication">Medication</option>
+                    <option value="surgery">Surgery</option>
+                    <option value="procedure">Procedure</option>
+                    <option value="others">Others</option>
+                </select>
+            </div>
+            <div id="interventionMedicationFields" style="display:none;">
+                <div class="form-group">
+                    <label class="form-label" for="interventionMedicationType">Medication schedule</label>
+                    <select id="interventionMedicationType" class="form-control" onchange="updateInterventionFields()">
+                        <option value="one_time">One-time medication</option>
+                        <option value="periodic">Periodic medication</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="interventionDrugName">Drug name</label>
+                    <input type="text" id="interventionDrugName" class="form-control">
+                </div>
+                <div id="interventionFrequencyFields" style="display:none;">
+                    <div class="form-group">
+                        <label class="form-label" for="interventionFrequencyCount">Frequency</label>
+                        <div style="display:flex; gap:0.5rem;">
+                            <span style="align-self:center;">Every</span>
+                            <input type="number" min="1" step="1" id="interventionFrequencyCount" class="form-control" aria-label="Frequency count">
+                            <select id="interventionFrequencyUnit" class="form-control" aria-label="Frequency unit">
+                                <option value="days">Days</option>
+                                <option value="weeks">Weeks</option>
+                                <option value="months">Months</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="interventionEndDate">End date (optional)</label>
+                        <input type="date" id="interventionEndDate" class="form-control">
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="interventionNotes">Notes</label>
+                <textarea id="interventionNotes" class="form-control" rows="3" placeholder="Additional details"></textarea>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:1rem; margin-top:1.5rem;">
+                <button type="button" class="btn btn-outline" onclick="closeInterventionForm()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Intervention</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="interventionAdministeredModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1001; overflow-y:auto;">
+    <div class="card" style="max-width:500px; margin:10% auto;">
+        <h3 class="card-title" id="interventionAdministeredTitle">Record Administration</h3>
+        <div id="interventionAdministeredError" role="alert" style="display:none; color:var(--danger-color); margin-bottom:1rem;"></div>
+        <form id="interventionAdministeredForm">
+            <div class="form-group">
+                <label class="form-label" for="interventionAdministeredAt">Date and time</label>
+                <input type="datetime-local" id="interventionAdministeredAt" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="interventionLogNotes">Notes</label>
+                <textarea id="interventionLogNotes" class="form-control" rows="3"></textarea>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:1rem; margin-top:1.5rem;">
+                <button type="button" class="btn btn-outline" onclick="closeInterventionAdministered()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="interventionLogViewModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1002; overflow-y:auto;">
+    <div class="card" style="max-width:500px; margin:10% auto;">
+        <h3 class="card-title">Intervention Log Details</h3>
+        <div id="interventionLogViewContent"></div>
+        <div style="display:flex; justify-content:flex-end; margin-top:1.5rem;">
+            <button type="button" class="btn btn-outline" onclick="closeInterventionLogView()">Close</button>
+        </div>
+    </div>
+</div>
+
+<div id="prescriptionViewModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
+    <div class="card" style="max-width:700px; margin:5% auto;">
+        <h3 class="card-title">Prescription Details</h3>
+        <div id="prescriptionViewContent"></div>
+        <div style="display:flex; justify-content:flex-end; margin-top:2rem;">
+            <button type="button" class="btn btn-outline" onclick="closePrescriptionView()">Close</button>
+        </div>
+    </div>
+</div>
+
+<div id="prescriptionDeleteModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
+    <div class="card" style="max-width:450px; margin:10% auto;">
+        <h3 class="card-title">Delete Prescription</h3>
+        <p id="prescriptionDeleteMessage"></p>
+        <div id="prescriptionDeleteError" role="alert" style="display:none; color:var(--danger-color); margin-top:1rem;"></div>
+        <div style="display:flex; justify-content:flex-end; gap:1rem; margin-top:2rem;">
+            <button type="button" class="btn btn-outline" onclick="closePrescriptionDelete()">Cancel</button>
+            <button type="button" id="confirmDeletePrescription" class="btn btn-primary" style="background:var(--danger-color);">Delete Prescription</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const patientId = "{{ session.get('user_id') }}";
+    const symptomsUrl = "{{ url_for('symptoms.get_symptoms') }}";
+    const createSymptomUrl = "{{ url_for('symptoms.create_symptom') }}";
+    let vitalsChartInstance = null;
+    let labsChartInstance = null;
+    let globalLabsData = [];
+
+    function switchTab(tabId, btnElement) {
+        const isDashboardHome = tabId === 'dashboardHome';
+        const selectedTab = isDashboardHome ? null : document.getElementById(tabId);
+        if ((!isDashboardHome && !selectedTab) || !btnElement) return;
+
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+        const dashboardHome = document.getElementById('dashboardHome');
+        dashboardHome.style.display = isDashboardHome ? '' : 'none';
+        if (selectedTab) selectedTab.classList.add('active');
+        btnElement.classList.add('active');
+
+        if (isDashboardHome) {
+            loadMedicationSchedules();
+            loadMedicationLog();
+        }
+    }
+
+    function setCurrentSymptomDateTime() {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('symptomRecordedAt').value = now.toISOString().slice(0, 16);
+    }
+
+    function setCurrentInterventionDateTime() {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('interventionAdministeredAt').value = now.toISOString().slice(0, 16);
+    }
+
+    const symptomsById = new Map();
+    const interventionsById = new Map();
+    let activeInterventionId = null;
+    let editingInterventionLogId = null;
+
+    async function readSymptomsResponse(response) {
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            throw new Error(`The symptoms service returned an unexpected response (HTTP ${response.status}). Refresh the page or contact support.`);
+        }
+        return response.json();
+    }
+
+    async function loadSymptoms() {
+        const list = document.getElementById('symptomsList');
+        try {
+            const response = await fetch(symptomsUrl, {
+                headers: {'Accept': 'application/json'}
+            });
+            const data = await readSymptomsResponse(response);
+            if (!response.ok) throw new Error(data.error || 'Unable to load symptoms');
+            symptomsById.clear();
+            const symptomSelect = document.getElementById('interventionSymptom');
+            symptomSelect.replaceChildren(new Option('Select symptom...', ''));
+            data.symptoms.forEach(symptom => {
+                symptomsById.set(symptom.id, symptom);
+                const label = `${new Date(symptom.recorded_at).toLocaleString()} - ${symptom.severity}: ${symptom.description}`;
+                symptomSelect.add(new Option(label, symptom.id));
+            });
+
+            if (!data.symptoms.length) {
+                list.innerHTML = '<p class="text-muted">No symptoms recorded.</p>';
+                return;
+            }
+
+            list.innerHTML = data.symptoms.map(symptom => `
+                <article style="padding:1rem; border:1px solid var(--border-color); border-radius:var(--border-radius-md); margin-bottom:0.75rem;">
+                    <div style="display:flex; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin-bottom:0.5rem;">
+                        <strong>${new Date(symptom.recorded_at).toLocaleString()}</strong>
+                        <span><strong>Severity:</strong> ${escapeHtml(symptom.severity.charAt(0).toUpperCase() + symptom.severity.slice(1))}</span>
+                    </div>
+                    <p style="white-space:pre-wrap;">${escapeHtml(symptom.description)}</p>
+                </article>
+            `).join('');
+        } catch (error) {
+            console.error('Failed to load symptoms:', error);
+            list.innerHTML = '<p class="text-muted">Unable to load symptom history.</p>';
+            document.getElementById('interventionSymptom').replaceChildren(
+                new Option('Unable to load symptoms', '')
+            );
+        }
+    }
+
+    document.getElementById('symptomForm').addEventListener('submit', async event => {
+        event.preventDefault();
+        const error = document.getElementById('symptomFormError');
+        error.style.display = 'none';
+
+        try {
+            const response = await fetch(createSymptomUrl, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+                body: JSON.stringify({
+                    recorded_at: document.getElementById('symptomRecordedAt').value,
+                    severity: document.getElementById('symptomSeverity').value,
+                    description: document.getElementById('symptomDescription').value
+                })
+            });
+            const data = await readSymptomsResponse(response);
+            if (!response.ok) throw new Error(data.error || 'Unable to save symptoms');
+
+            document.getElementById('symptomForm').reset();
+            setCurrentSymptomDateTime();
+            await loadSymptoms();
+        } catch (err) {
+            error.textContent = err.message || 'Unable to save symptoms. Please try again.';
+            error.style.display = 'block';
+        }
+    });
+
+    function openInterventionForm(method) {
+        if (!method) return;
+        const form = document.getElementById('interventionForm');
+        form.reset();
+        document.getElementById('interventionMethodType').value = method;
+        document.getElementById('interventionFormError').style.display = 'none';
+        updateInterventionFields();
+        document.getElementById('interventionModal').style.display = 'block';
+    }
+
+    function closeInterventionForm() {
+        document.getElementById('interventionModal').style.display = 'none';
+        document.getElementById('interventionForm').reset();
+        document.getElementById('interventionMethod').value = '';
+    }
+
+    function updateInterventionFields() {
+        const method = document.getElementById('interventionMethodType').value;
+        const isMedication = method === 'medication';
+        const isPeriodic = isMedication && document.getElementById('interventionMedicationType').value === 'periodic';
+        document.getElementById('interventionMedicationFields').style.display = isMedication ? 'block' : 'none';
+        document.getElementById('interventionFrequencyFields').style.display = isPeriodic ? 'block' : 'none';
+        document.getElementById('interventionDrugName').required = isMedication;
+        document.getElementById('interventionFrequencyCount').required = isPeriodic;
+    }
+
+    document.getElementById('interventionForm').addEventListener('submit', async event => {
+        event.preventDefault();
+        const method = document.getElementById('interventionMethodType').value;
+        const medicationType = document.getElementById('interventionMedicationType').value;
+        const payload = {
+            practitioner_id: document.getElementById('interventionPractitioner').value,
+            symptom_id: document.getElementById('interventionSymptom').value,
+            method,
+            notes: document.getElementById('interventionNotes').value
+        };
+        if (method === 'medication') {
+            payload.medication_type = medicationType;
+            payload.drug_name = document.getElementById('interventionDrugName').value;
+            if (medicationType === 'periodic') {
+                payload.frequency_count = document.getElementById('interventionFrequencyCount').value;
+                payload.frequency_unit = document.getElementById('interventionFrequencyUnit').value;
+                payload.end_date = document.getElementById('interventionEndDate').value;
+            }
+        }
+
+        const error = document.getElementById('interventionFormError');
+        error.style.display = 'none';
+        try {
+            const response = await fetch('/api/interventions', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Unable to save intervention');
+
+            closeInterventionForm();
+            await loadInterventions();
+        } catch (err) {
+            error.textContent = err.message || 'Unable to save intervention. Please try again.';
+            error.style.display = 'block';
+        }
+    });
+
+    function interventionMethodLabel(method) {
+        return method.charAt(0).toUpperCase() + method.slice(1);
+    }
+
+    function interventionPlanDetails(plan) {
+        const medicationDetails = plan.method === 'medication'
+            ? `<p><strong>Drug:</strong> ${escapeHtml(plan.drug_name)}</p>
+               <p><strong>Schedule:</strong> ${plan.medication_type === 'one_time'
+                    ? 'One-time medication'
+                    : `Every ${plan.frequency_count} ${escapeHtml(plan.frequency_unit)}${plan.end_date ? ` until ${escapeHtml(plan.end_date)}` : ''}`}</p>`
+            : '';
+        return `
+            <p><strong>Method:</strong> ${escapeHtml(interventionMethodLabel(plan.method))}</p>
+            ${medicationDetails}
+            <p><strong>Practitioner:</strong> ${escapeHtml(plan.practitioner_name)}</p>
+            <p><strong>Related symptom:</strong> ${escapeHtml(plan.symptom_description)} (${escapeHtml(plan.symptom_severity)})</p>
+            ${plan.notes ? `<p><strong>Notes:</strong> ${escapeHtml(plan.notes)}</p>` : ''}
+        `;
+    }
+
+    async function loadInterventions() {
+        const list = document.getElementById('interventionsList');
+        try {
+            const response = await fetch('/api/interventions');
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Unable to load interventions');
+
+            interventionsById.clear();
+            data.interventions.forEach(plan => interventionsById.set(plan.id, plan));
+            if (!data.interventions.length) {
+                list.innerHTML = '<p class="text-muted">No interventions recorded.</p>';
+                return;
+            }
+
+            list.innerHTML = data.interventions.map(plan => `
+                <article style="padding:1rem; border:1px solid var(--border-color); border-radius:var(--border-radius-md); margin-bottom:1rem;">
+                    ${interventionPlanDetails(plan)}
+                    <div style="margin:0.75rem 0;">
+                        <button type="button" class="btn btn-primary" onclick="openInterventionLogForm(${plan.id})">Administered</button>
+                    </div>
+                    <h4 style="margin:1rem 0 0.5rem;">Administration history</h4>
+                    ${plan.logs.length ? plan.logs.map(log => `
+                        <div style="padding:0.75rem 0; border-top:1px solid var(--border-color);">
+                            <strong>${new Date(log.administered_at).toLocaleString()}</strong>
+                            ${log.notes ? `<p>${escapeHtml(log.notes)}</p>` : ''}
+                            <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+                                <button type="button" class="btn btn-outline" onclick="viewInterventionLog(${plan.id}, ${log.id})">View</button>
+                                <button type="button" class="btn btn-outline" onclick="editInterventionLog(${plan.id}, ${log.id})">Edit</button>
+                            </div>
+                        </div>
+                    `).join('') : '<p class="text-muted">No administration recorded yet.</p>'}
+                </article>
+            `).join('');
+        } catch (error) {
+            console.error('Failed to load interventions:', error);
+            list.innerHTML = '<p class="text-muted">Unable to load interventions.</p>';
+        }
+    }
+
+    function toDateTimeLocal(value) {
+        const date = new Date(value);
+        date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+        return date.toISOString().slice(0, 16);
+    }
+
+    function openInterventionLogForm(interventionId, log = null) {
+        activeInterventionId = interventionId;
+        editingInterventionLogId = log ? log.id : null;
+        document.getElementById('interventionAdministeredForm').reset();
+        document.getElementById('interventionAdministeredError').style.display = 'none';
+        document.getElementById('interventionAdministeredTitle').textContent =
+            log ? 'Edit Administration Record' : 'Record Administration';
+        document.getElementById('interventionAdministeredAt').value =
+            log ? toDateTimeLocal(log.administered_at) : '';
+        if (!log) setCurrentInterventionDateTime();
+        document.getElementById('interventionLogNotes').value = log?.notes || '';
+        document.getElementById('interventionAdministeredModal').style.display = 'block';
+    }
+
+    function closeInterventionAdministered() {
+        activeInterventionId = null;
+        editingInterventionLogId = null;
+        document.getElementById('interventionAdministeredModal').style.display = 'none';
+    }
+
+    document.getElementById('interventionAdministeredForm').addEventListener('submit', async event => {
+        event.preventDefault();
+        if (!activeInterventionId) return;
+        const payload = {
+            administered_at: document.getElementById('interventionAdministeredAt').value,
+            notes: document.getElementById('interventionLogNotes').value
+        };
+        const isEditing = editingInterventionLogId !== null;
+        const endpoint = isEditing
+            ? `/api/interventions/logs/${editingInterventionLogId}`
+            : `/api/interventions/${activeInterventionId}/logs`;
+        const error = document.getElementById('interventionAdministeredError');
+        error.style.display = 'none';
+        try {
+            const response = await fetch(endpoint, {
+                method: isEditing ? 'PUT' : 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Unable to save administration record');
+
+            closeInterventionAdministered();
+            await loadInterventions();
+        } catch (err) {
+            error.textContent = err.message || 'Unable to save administration record.';
+            error.style.display = 'block';
+        }
+    });
+
+    function findInterventionLog(interventionId, logId) {
+        const plan = interventionsById.get(interventionId);
+        return plan ? {plan, log: plan.logs.find(item => item.id === logId)} : null;
+    }
+
+    function viewInterventionLog(interventionId, logId) {
+        const record = findInterventionLog(interventionId, logId);
+        if (!record || !record.log) return;
+        document.getElementById('interventionLogViewContent').innerHTML = `
+            ${interventionPlanDetails(record.plan)}
+            <p><strong>Administered:</strong> ${new Date(record.log.administered_at).toLocaleString()}</p>
+            <p><strong>Administration notes:</strong> ${escapeHtml(record.log.notes || 'None')}</p>
+        `;
+        document.getElementById('interventionLogViewModal').style.display = 'block';
+    }
+
+    function closeInterventionLogView() {
+        document.getElementById('interventionLogViewModal').style.display = 'none';
+    }
+
+    function editInterventionLog(interventionId, logId) {
+        const record = findInterventionLog(interventionId, logId);
+        if (record && record.log) openInterventionLogForm(interventionId, record.log);
+    }
+
+    function openVitalsModal() {
+        document.getElementById('vitalsModal').style.display = 'block';
+    }
+    
+    function closeVitalsModal() {
+        document.getElementById('vitalsModal').style.display = 'none';
+        document.getElementById('vitalsForm').reset();
+    }
+    
+    function showVitalDetails(dateStr, sys, dia, hr, sugar) {
+        document.getElementById('vitalDetailModal').style.display = 'block';
+        document.getElementById('vitalDetailContent').innerHTML = `
+            <p><strong>Recorded At:</strong> ${dateStr}</p>
+            <p><strong>Blood Pressure:</strong> ${sys || '--'} / ${dia || '--'} mmHg</p>
+            <p><strong>Heart Rate:</strong> ${hr || '--'} bpm</p>
+            <p><strong>Blood Sugar:</strong> ${sugar || '--'} mg/dL</p>
+        `;
+    }
+    
+    function closeVitalDetailModal() {
+        document.getElementById('vitalDetailModal').style.display = 'none';
+    }
+
+    function openLabModal() { document.getElementById('labModal').style.display = 'block'; }
+    function closeLabModal() { document.getElementById('labModal').style.display = 'none'; document.getElementById('labForm').reset(); }
+
+    function addLabParamRow() {
+        const row = document.createElement('div');
+        row.className = 'grid-3 lab-param-row';
+        row.style.cssText = 'margin-bottom: 0.5rem; gap:0.5rem;';
+        row.innerHTML = `
+            <input type="text" class="form-control param-name" list="paramNamesList" placeholder="Name">
+            <input type="number" step="0.01" class="form-control param-value" placeholder="Value">
+            <input type="text" class="form-control param-unit" placeholder="Unit">
+        `;
+        document.getElementById('labParamsContainer').appendChild(row);
+    }
+
+    function getScheduledMedicationDateTime(timeOfDay) {
+        const today = new Date();
+        const localDate = [
+            today.getFullYear(),
+            String(today.getMonth() + 1).padStart(2, '0'),
+            String(today.getDate()).padStart(2, '0')
+        ].join('-');
+        return `${localDate}T${timeOfDay}`;
+    }
+
+    async function loadMedicationSchedules() {
+        const medsList = document.getElementById('medsList');
+        try {
+            const response = await fetch(`/api/medications/schedule/patient/${patientId}`, {
+                cache: 'no-store'
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to load medication schedules');
+            }
+
+            if (data.schedules && data.schedules.length > 0) {
+                const sortedSchedules = [...data.schedules].sort((a, b) =>
+                    a.time_of_day.localeCompare(b.time_of_day) ||
+                    a.drug_name.localeCompare(b.drug_name, undefined, { sensitivity: 'base' })
+                );
+                medsList.innerHTML = sortedSchedules.slice(0, 10).map(s => `
+                    <div style="padding: 1rem; border: 1px solid var(--border-color); border-radius: var(--border-radius-md); margin-bottom: 1rem;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                            <div>
+                                <strong>${escapeHtml(s.drug_name)}</strong> - ${s.quantity} ${escapeHtml(s.unit)}<br>
+                                <span style="color:var(--primary-color); font-weight:600;">⏰ ${escapeHtml(s.time_of_day)}</span>
+                                <p style="font-size:0.875rem; color:var(--text-muted); margin:0;">${escapeHtml(s.dependent_event)}</p>
+                            </div>
+                        </div>
+                        <div style="margin-top: 1rem; display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="datetime-local" id="medTime_${s.id}" class="form-control" style="width: auto; padding: 0.25rem 0.5rem;" title="Scheduled date and time (editable)" value="${escapeHtml(getScheduledMedicationDateTime(s.time_of_day))}">
+                            <button class="btn btn-success" style="padding:0.25rem 0.75rem;" onclick="markTaken(${s.id})">Mark Taken</button>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                medsList.innerHTML = '<p class="text-muted">No medications scheduled.</p>';
+            }
+        } catch (error) {
+            console.error('Failed to load medication schedules:', error);
+            medsList.innerHTML = '<p class="text-danger">Unable to load medication schedules.</p>';
+        }
+    }
+
+    function setMedicationLogDateToToday() {
+        const today = new Date();
+        today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
+        document.getElementById('medicationLogDate').value = today.toISOString().slice(0, 10);
+    }
+
+    function setVitalsDateRangeToLastWeek() {
+        const today = new Date();
+        today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
+        const endDate = today.toISOString().slice(0, 10);
+        const start = new Date(today);
+        start.setDate(start.getDate() - 6);
+        document.getElementById('vitalsStartDate').value = start.toISOString().slice(0, 10);
+        document.getElementById('vitalsEndDate').value = endDate;
+    }
+
+    async function loadMedicationLog() {
+        const medicationLog = document.getElementById('medicationLog');
+        const selectedDate = document.getElementById('medicationLogDate').value;
+        if (!selectedDate) {
+            medicationLog.innerHTML = '<p class="text-muted">Select a date to view medication history.</p>';
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                `/api/medications/logs/patient/${patientId}?date=${encodeURIComponent(selectedDate)}`,
+                {cache: 'no-store'}
+            );
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Unable to load medication history');
+
+            if (data.logs.length) {
+                medicationLog.innerHTML = data.logs.map(log => `
+                    <div style="padding:0.75rem 0; border-bottom:1px solid var(--border-color);">
+                        <strong>${escapeHtml(log.drug_name)}</strong>
+                        <span class="text-muted">— ${escapeHtml(log.status)}</span>
+                        <div class="text-muted" style="font-size:0.875rem;">
+                            ${new Date(log.administered_at).toLocaleString([], {year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                medicationLog.innerHTML = `<p class="text-muted">No medications logged on ${escapeHtml(selectedDate)}.</p>`;
+            }
+        } catch (error) {
+            console.error('Failed to load medication history:', error);
+            medicationLog.innerHTML = '<p class="text-danger">Unable to load medication history for the selected date.</p>';
+        }
+    }
+
+    async function loadDashboard() {
+        try {
+            const startDate = document.getElementById('vitalsStartDate').value;
+            const endDate = document.getElementById('vitalsEndDate').value;
+            if (!startDate || !endDate || startDate > endDate) {
+                document.getElementById('vitalsHistory').innerHTML =
+                    '<p class="text-danger">Choose a valid date range (start date must be on or before end date).</p>';
+                return;
+            }
+
+            const query = new URLSearchParams({start_date: startDate, end_date: endDate});
+            const res = await fetch(`/api/vitals/patient/${patientId}/timeline?${query.toString()}`);
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed to load patient timeline');
+            }
+
+            const vitals = data.vitals;
+            if (vitals && vitals.length > 0) {
+                const latest = vitals[vitals.length - 1];
+                document.getElementById('lastBp').textContent = (latest.systolic && latest.diastolic) ? `${latest.systolic}/${latest.diastolic}` : '--/--';
+                document.getElementById('lastHr').textContent = latest.heart_rate || '--';
+                document.getElementById('lastSugar').textContent = latest.blood_sugar || '--';
+                
+                const historyHtml = vitals.slice().reverse().map(v => {
+                    const fullDateStr = new Date(v.recorded_at).toLocaleString([], {year:'numeric', month:'short', day:'numeric', hour: '2-digit', minute:'2-digit'});
+                    
+                    let paramsHtml = '';
+                    if (v.systolic || v.diastolic) paramsHtml += `<div style="background:var(--background-color); padding:0.5rem 1rem; border-radius:var(--border-radius-sm);"><strong>BP:</strong> ${v.systolic || '--'}/${v.diastolic || '--'} mmHg</div>`;
+                    if (v.heart_rate) paramsHtml += `<div style="background:var(--background-color); padding:0.5rem 1rem; border-radius:var(--border-radius-sm);"><strong>HR:</strong> ${v.heart_rate} bpm</div>`;
+                    if (v.blood_sugar) paramsHtml += `<div style="background:var(--background-color); padding:0.5rem 1rem; border-radius:var(--border-radius-sm);"><strong>Sugar:</strong> ${v.blood_sugar} mg/dL</div>`;
+
+                    return `
+                    <div style="padding: 1rem; border: 1px solid var(--border-color); border-radius: var(--border-radius-md); margin-bottom: 1rem; cursor: pointer; transition: background 0.2s;" 
+                         onmouseover="this.style.backgroundColor='#f0f4ff'" onmouseout="this.style.backgroundColor='transparent'"
+                         onclick="showVitalDetails('${fullDateStr}', ${v.systolic || 'null'}, ${v.diastolic || 'null'}, ${v.heart_rate || 'null'}, ${v.blood_sugar || 'null'})">
+                        <h4 style="margin-bottom:0.5rem; color:var(--primary-color);">Vitals Reading <span style="color:var(--text-muted); font-size:0.85rem; font-weight:normal;">(${fullDateStr})</span></h4>
+                        <div style="display:flex; flex-wrap:wrap; gap:1rem;">
+                            ${paramsHtml || '<div class="text-muted">No specific parameters recorded.</div>'}
+                        </div>
+                    </div>
+                    `;
+                }).join('');
+                document.getElementById('vitalsHistory').innerHTML = historyHtml;
+                // Render Chart
+                renderVitalsChart(vitals);
+            } else {
+                document.getElementById('lastBp').textContent = '--/--';
+                document.getElementById('lastHr').textContent = '--';
+                document.getElementById('lastSugar').textContent = '--';
+                document.getElementById('vitalsHistory').innerHTML = '<p class="text-muted">No vitals recorded in the selected date range.</p>';
+                renderVitalsChart([]);
+            }
+
+            // Load Labs
+            const labsRes = await fetch(`/api/labs/patient/${patientId}`);
+            const labsData = await labsRes.json();
+            globalLabsData = labsData.reports || [];
+            
+            if (globalLabsData.length > 0) {
+                const labsHtml = globalLabsData.map(r => `
+                    <div style="padding: 1rem; border: 1px solid var(--border-color); border-radius: var(--border-radius-md); margin-bottom: 1rem;">
+                        <h4 style="margin-bottom:0.5rem; color:var(--primary-color);">${r.test_name} <span style="color:var(--text-muted); font-size:0.85rem; font-weight:normal;">(${new Date(r.recorded_at).toLocaleDateString()})</span></h4>
+                        <div style="display:flex; flex-wrap:wrap; gap:1rem;">
+                            ${r.parameters.map(p => `
+                                <div style="background:var(--background-color); padding:0.5rem 1rem; border-radius:var(--border-radius-sm);">
+                                    <strong>${p.name}:</strong> ${p.value} ${p.unit}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('');
+                document.getElementById('labsHistory').innerHTML = labsHtml;
+            } else {
+                document.getElementById('labsHistory').innerHTML = '<p class="text-muted">No lab reports found.</p>';
+            }
+            
+            // Load Unique Lab Parameters for Autocomplete & Chart Dropdown
+            try {
+                const paramRes = await fetch('/api/labs/parameters/unique');
+                const paramData = await paramRes.json();
+                if (paramData.parameters && paramData.parameters.length > 0) {
+                    const datalist = document.getElementById('paramNamesList');
+                    datalist.innerHTML = paramData.parameters.map(p => `<option value="${p}">`).join('');
+                    
+                    const selectList = document.getElementById('labChartParamSelect');
+                    selectList.innerHTML = '<option value="">Select a parameter...</option>' + 
+                                           paramData.parameters.map(p => `<option value="${p}">${p}</option>`).join('');
+                    
+                    // Auto-select first parameter and render
+                    selectList.value = paramData.parameters[0];
+                    renderLabsChart();
+                }
+            } catch(e) {
+                console.error("Failed to load autocomplete parameters", e);
+            }
+            
+        } catch(e) {
+            console.error(e);
+            document.getElementById('vitalsHistory').innerHTML = '<p class="text-danger">Unable to load dashboard health data.</p>';
+        }
+    }
+
+    function escapeHtml(value) {
+        const element = document.createElement('span');
+        element.textContent = value ?? '';
+        return element.innerHTML;
+    }
+
+    async function markTaken(scheduleId) {
+        const timeInput = document.getElementById(`medTime_${scheduleId}`).value;
+        const administeredAt = new Date(timeInput);
+        if (!timeInput || Number.isNaN(administeredAt.getTime())) {
+            alert('Please enter a valid date and time before marking the medication as taken.');
+            return;
+        }
+
+        const payload = { schedule_id: scheduleId, status: 'taken' };
+        payload.administered_at = administeredAt.toISOString();
+
+        try {
+            const response = await fetch('/api/medications/log', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to log medication');
+            }
+            alert('Medication marked as taken!');
+            await Promise.all([loadMedicationSchedules(), loadMedicationLog()]);
+        } catch(e) {
+            console.error(e);
+            alert(`Unable to log medication: ${e.message}`);
+        }
+    }
+
+    // Practitioners Logic
+    function openPractitionerModal() { document.getElementById('practitionerModal').style.display = 'block'; }
+    function closePractitionerModal() { document.getElementById('practitionerModal').style.display = 'none'; document.getElementById('practitionerForm').reset(); }
+
+    document.getElementById('practitionerForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+            patient_id: parseInt(patientId),
+            name: document.getElementById('pracName').value,
+            specialization: document.getElementById('pracSpec').value,
+            medical_practice: document.getElementById('pracPractice').value
+        };
+        try {
+            await fetch('/api/medications/practitioner', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+            });
+            closePractitionerModal();
+            loadPractitioners();
+        } catch(e) { console.error(e); }
+    });
+
+    async function loadPractitioners() {
+        try {
+            const res = await fetch(`/api/medications/practitioners/patient/${patientId}`);
+            const data = await res.json();
+            const list = document.getElementById('practitionersList');
+            const select = document.getElementById('prescPractitioner');
+            const interventionSelect = document.getElementById('interventionPractitioner');
+            if (data.practitioners && data.practitioners.length > 0) {
+                list.innerHTML = data.practitioners.map(p => `
+                    <div style="padding:0.5rem; border-bottom:1px solid var(--border-color);">
+                        <strong>${p.name}</strong> <span style="font-size:0.8rem; color:var(--text-muted);">(${p.medical_practice})</span><br>
+                        <span style="font-size:0.85rem;">${p.specialization}</span>
+                    </div>
+                `).join('');
+                select.innerHTML = '<option value="">Select Practitioner...</option>' + data.practitioners.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+                interventionSelect.replaceChildren(new Option('Select practitioner...', ''));
+                data.practitioners.forEach(practitioner => {
+                    interventionSelect.add(new Option(practitioner.name, practitioner.id));
+                });
+            } else {
+                list.innerHTML = '<p class="text-muted">No practitioners added.</p>';
+                select.innerHTML = '<option value="">Select Practitioner...</option>';
+                interventionSelect.replaceChildren(new Option('Add a practitioner first...', ''));
+            }
+        } catch(e) { console.error(e); }
+    }
+
+    // Prescriptions Logic
+    const prescriptionsById = new Map();
+    let prescriptionToDelete = null;
+
+    function escapePrescriptionHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, character => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        })[character]);
+    }
+
+    function resetPrescriptionForm() {
+        document.getElementById('prescriptionForm').reset();
+        document.getElementById('prescId').value = '';
+        document.getElementById('prescriptionModalTitle').textContent = 'Add Prescription';
+        document.getElementById('prescriptionFormError').style.display = 'none';
+        document.getElementById('prescItemsContainer').innerHTML = '';
+        addPrescItemRow();
+    }
+
+    function openPrescriptionModal() {
+        resetPrescriptionForm();
+        document.getElementById('prescriptionModal').style.display = 'block';
+    }
+
+    function closePrescriptionModal() {
+        document.getElementById('prescriptionModal').style.display = 'none';
+        resetPrescriptionForm();
+    }
+
+    function openEditPrescription(id) {
+        const prescription = prescriptionsById.get(id);
+        if (!prescription) return;
+
+        resetPrescriptionForm();
+        document.getElementById('prescriptionModalTitle').textContent = 'Edit Prescription';
+        document.getElementById('prescId').value = prescription.id;
+        document.getElementById('prescDate').value = prescription.date_issued;
+        document.getElementById('prescNotes').value = prescription.notes || '';
+        document.getElementById('prescPractitioner').value = prescription.practitioner_id || '';
+        document.getElementById('prescItemsContainer').innerHTML = '';
+        prescription.items.forEach(item => addPrescItemRow(item));
+        document.getElementById('prescriptionModal').style.display = 'block';
+    }
+
+    function addPrescItemRow(item = null) {
+        const row = document.createElement('div');
+        row.className = 'grid-4 presc-item-row';
+        row.style.cssText = 'margin-bottom: 0.5rem; gap:0.5rem; align-items:center;';
+        const disabled = item && item.has_logs ? 'disabled' : '';
+        const itemId = item ? `data-item-id="${item.id}"` : '';
+        const lockNote = item && item.has_logs
+            ? '<small style="grid-column:span 4; color:var(--text-muted);">This medication has recorded history and cannot be changed or removed.</small>'
+            : '';
+        row.innerHTML = `
+            <input type="text" class="form-control item-drug" placeholder="Drug Name" required ${disabled} value="${escapePrescriptionHtml(item?.drug_name)}" ${itemId}>
+            <input type="number" min="0.1" step="0.1" class="form-control item-qty" placeholder="Qty (e.g. 1)" required ${disabled} value="${escapePrescriptionHtml(item?.quantity)}">
+            <input type="text" class="form-control item-unit" placeholder="Unit (e.g. pills)" required ${disabled} value="${escapePrescriptionHtml(item?.unit)}">
+            <input type="time" class="form-control item-time" required ${disabled} value="${escapePrescriptionHtml(item?.time_of_day)}">
+            <select class="form-control item-event" style="grid-column: span 4;" ${disabled}>
+                <option value="Independent">Independent of Meal</option>
+                <option value="Before Meal">Before Meal</option>
+                <option value="After Meal">After Meal</option>
+            </select>
+            ${lockNote}
+            <button type="button" class="btn btn-outline remove-presc-item" style="grid-column:span 4; justify-self:end; padding:0.25rem 0.5rem; font-size:0.875rem;" ${disabled}>Remove medication</button>
+        `;
+        row.querySelector('.item-event').value = item?.dependent_event || 'Independent';
+        const removeButton = row.querySelector('.remove-presc-item');
+        if (!item?.has_logs) {
+            removeButton.addEventListener('click', () => {
+                if (document.querySelectorAll('.presc-item-row').length > 1) {
+                    row.remove();
+                }
+            });
+        }
+        document.getElementById('prescItemsContainer').appendChild(row);
+    }
+
+    function openPrescriptionView(id) {
+        const prescription = prescriptionsById.get(id);
+        if (!prescription) return;
+
+        const itemRows = prescription.items.map(item => `
+            <tr>
+                <td style="padding:0.75rem; border-bottom:1px solid var(--border-color);">${escapePrescriptionHtml(item.drug_name)}</td>
+                <td style="padding:0.75rem; border-bottom:1px solid var(--border-color);">${escapePrescriptionHtml(item.quantity)} ${escapePrescriptionHtml(item.unit)}</td>
+                <td style="padding:0.75rem; border-bottom:1px solid var(--border-color);">${escapePrescriptionHtml(item.time_of_day)}</td>
+                <td style="padding:0.75rem; border-bottom:1px solid var(--border-color);">${escapePrescriptionHtml(item.dependent_event || 'Independent')}</td>
+            </tr>
+        `).join('');
+
+        document.getElementById('prescriptionViewContent').innerHTML = `
+            <dl>
+                <dt><strong>Prescription ID</strong></dt>
+                <dd>${prescription.id}</dd>
+                <dt><strong>Patient</strong></dt>
+                <dd>${escapePrescriptionHtml(prescription.patient_name || 'Not specified')}</dd>
+                <dt><strong>Date issued</strong></dt>
+                <dd>${escapePrescriptionHtml(prescription.date_issued)}</dd>
+                <dt><strong>Practitioner</strong></dt>
+                <dd>${escapePrescriptionHtml(prescription.practitioner_name || 'Not specified')}</dd>
+                <dt><strong>Notes</strong></dt>
+                <dd>${escapePrescriptionHtml(prescription.notes || 'No notes')}</dd>
+            </dl>
+            <h4 style="margin:1.5rem 0 0.5rem;">Medications</h4>
+            <div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; text-align:left;">
+                    <thead><tr>
+                        <th style="padding:0.75rem;">Medication</th>
+                        <th style="padding:0.75rem;">Quantity</th>
+                        <th style="padding:0.75rem;">Time</th>
+                        <th style="padding:0.75rem;">Meal instructions</th>
+                    </tr></thead>
+                    <tbody>${itemRows}</tbody>
+                </table>
+            </div>
+        `;
+        document.getElementById('prescriptionViewModal').style.display = 'block';
+    }
+
+    function closePrescriptionView() {
+        document.getElementById('prescriptionViewModal').style.display = 'none';
+    }
+
+    function openPrescriptionDelete(id) {
+        const prescription = prescriptionsById.get(id);
+        if (!prescription) return;
+        prescriptionToDelete = prescription.id;
+        const hasHistory = prescription.items.some(item => item.has_logs);
+        document.getElementById('prescriptionDeleteMessage').textContent = hasHistory
+            ? `This prescription dated ${prescription.date_issued} has medication history and cannot be deleted.`
+            : `Delete the prescription dated ${prescription.date_issued}? This cannot be undone.`;
+        const deleteError = document.getElementById('prescriptionDeleteError');
+        deleteError.textContent = hasHistory ? 'Prescriptions with recorded medication history are kept to preserve the patient record.' : '';
+        deleteError.style.display = hasHistory ? 'block' : 'none';
+        document.getElementById('confirmDeletePrescription').disabled = hasHistory;
+        document.getElementById('prescriptionDeleteModal').style.display = 'block';
+    }
+
+    function closePrescriptionDelete() {
+        prescriptionToDelete = null;
+        document.getElementById('prescriptionDeleteModal').style.display = 'none';
+        document.getElementById('confirmDeletePrescription').disabled = false;
+    }
+
+    document.getElementById('confirmDeletePrescription').addEventListener('click', async () => {
+        if (!prescriptionToDelete) return;
+        const error = document.getElementById('prescriptionDeleteError');
+        try {
+            const response = await fetch(`/api/medications/prescription/${prescriptionToDelete}`, {
+                method: 'DELETE'
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Unable to delete prescription');
+
+            closePrescriptionDelete();
+            await loadPrescriptions();
+            await Promise.all([loadMedicationSchedules(), loadMedicationLog(), loadDashboard()]);
+        } catch (err) {
+            error.textContent = err.message || 'Unable to delete prescription. Please try again.';
+            error.style.display = 'block';
+        }
+    });
+
+    document.getElementById('prescriptionForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const items = [];
+        document.querySelectorAll('.presc-item-row').forEach(row => {
+            const drug = row.querySelector('.item-drug').value.trim();
+            const qty = row.querySelector('.item-qty').value;
+            const unit = row.querySelector('.item-unit').value.trim();
+            const time = row.querySelector('.item-time').value;
+            const event = row.querySelector('.item-event').value;
+            const item = { drug_name: drug, quantity: qty, unit: unit, time_of_day: time, dependent_event: event };
+            if (row.querySelector('.item-drug').dataset.itemId) {
+                item.id = Number(row.querySelector('.item-drug').dataset.itemId);
+            }
+            if (drug && qty && unit && time) items.push(item);
+        });
+
+        const error = document.getElementById('prescriptionFormError');
+        if (items.length === 0) {
+            error.textContent = 'Add at least one complete medication.';
+            error.style.display = 'block';
+            return;
+        }
+
+        const payload = {
+            patient_id: Number(patientId),
+            practitioner_id: document.getElementById('prescPractitioner').value,
+            date_issued: document.getElementById('prescDate').value,
+            notes: document.getElementById('prescNotes').value,
+            items: items
+        };
+        const prescriptionId = document.getElementById('prescId').value;
+        const isEditing = Boolean(prescriptionId);
+
+        try {
+            const response = await fetch(
+                isEditing ? `/api/medications/prescription/${prescriptionId}` : '/api/medications/prescription',
+                {
+                    method: isEditing ? 'PUT' : 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                }
+            );
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Unable to save prescription');
+
+            closePrescriptionModal();
+            await loadPrescriptions();
+            await Promise.all([loadMedicationSchedules(), loadMedicationLog(), loadDashboard()]);
+        } catch(err) {
+            error.textContent = err.message || 'Unable to save prescription. Please try again.';
+            error.style.display = 'block';
+        }
+    });
+
+    async function loadPrescriptions() {
+        try {
+            const res = await fetch(`/api/medications/prescriptions/patient/${patientId}`);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Unable to load prescriptions');
+            const list = document.getElementById('prescriptionsList');
+            prescriptionsById.clear();
+            if (data.prescriptions && data.prescriptions.length > 0) {
+                data.prescriptions.forEach(prescription => prescriptionsById.set(prescription.id, prescription));
+                list.innerHTML = data.prescriptions.map(p => `
+                    <div style="padding:0.75rem; border:1px solid var(--border-color); border-radius:var(--border-radius-sm); margin-bottom:0.5rem;">
+                        <strong>Date:</strong> ${escapePrescriptionHtml(p.date_issued)} <br>
+                        <span style="font-size:0.85rem; color:var(--text-muted);">${p.items.length} medications</span>
+                        <div style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.75rem;">
+                            <button type="button" class="btn btn-outline" onclick="openPrescriptionView(${p.id})">View</button>
+                            <button type="button" class="btn btn-outline" onclick="openEditPrescription(${p.id})">Edit</button>
+                            <button type="button" class="btn btn-outline" onclick="openPrescriptionDelete(${p.id})">Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                list.innerHTML = '<p class="text-muted">No prescriptions found.</p>';
+            }
+        } catch(e) {
+            document.getElementById('prescriptionsList').textContent = e.message || 'Unable to load prescriptions.';
+        }
+    }
+
+    document.getElementById('vitalsForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const recordedAt = document.getElementById('recordedAt').value;
+        const payload = {
+            patient_id: parseInt(patientId),
+            systolic: parseInt(document.getElementById('sysBp').value) || null,
+            diastolic: parseInt(document.getElementById('diaBp').value) || null,
+            heart_rate: parseInt(document.getElementById('hr').value) || null,
+            blood_sugar: parseFloat(document.getElementById('sugar').value) || null
+        };
+        
+        if (recordedAt) {
+            payload.recorded_at = recordedAt;
+        }
+        
+        await fetch('/api/vitals/record', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        
+        closeVitalsModal();
+        loadDashboard();
+    });
+
+    document.getElementById('labForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const params = [];
+        document.querySelectorAll('.lab-param-row').forEach(row => {
+            const name = row.querySelector('.param-name').value.trim();
+            const value = row.querySelector('.param-value').value.trim();
+            const unit = row.querySelector('.param-unit').value.trim();
+            
+            if (name && value) {
+                params.push({ name, value, unit });
+            }
+        });
+
+        if (params.length === 0) {
+            alert('Please enter at least one valid lab parameter.');
+            return;
+        }
+
+        const payload = {
+            patient_id: parseInt(patientId),
+            test_name: document.getElementById('labTestName').value,
+            parameters: params
+        };
+        
+        const recordedAt = document.getElementById('labRecordedAt').value;
+        if (recordedAt) {
+            payload.recorded_at = recordedAt;
+        }
+
+        try {
+            await fetch('/api/labs/report', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            closeLabModal();
+            loadDashboard();
+        } catch(e) {
+            console.error(e);
+        }
+    });
+
+    function renderVitalsChart(vitals) {
+        if (vitalsChartInstance) {
+            vitalsChartInstance.destroy();
+            vitalsChartInstance = null;
+        }
+        if (!vitals || vitals.length === 0) return;
+        
+        // Sort chronologically for charting
+        const sortedVitals = [...vitals].sort((a, b) => new Date(a.recorded_at) - new Date(b.recorded_at));
+        
+        const labels = sortedVitals.map(v => new Date(v.recorded_at).toLocaleDateString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}));
+        const systolicData = sortedVitals.map(v => v.systolic);
+        const diastolicData = sortedVitals.map(v => v.diastolic);
+        const hrData = sortedVitals.map(v => v.heart_rate);
+
+        const ctx = document.getElementById('vitalsChart').getContext('2d');
+        vitalsChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Systolic BP',
+                        data: systolicData,
+                        borderColor: '#f72585',
+                        backgroundColor: '#f72585',
+                        tension: 0.3,
+                        spanGaps: true
+                    },
+                    {
+                        label: 'Diastolic BP',
+                        data: diastolicData,
+                        borderColor: '#4361ee',
+                        backgroundColor: '#4361ee',
+                        tension: 0.3,
+                        spanGaps: true
+                    },
+                    {
+                        label: 'Heart Rate',
+                        data: hrData,
+                        borderColor: '#4cc9f0',
+                        backgroundColor: '#4cc9f0',
+                        tension: 0.3,
+                        spanGaps: true
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                    x: {
+                        ticks: { maxRotation: 45, minRotation: 45 }
+                    },
+                    y: {
+                        beginAtZero: false
+                    }
+                }
+            }
+        });
+    }
+
+    function renderLabsChart() {
+        const paramName = document.getElementById('labChartParamSelect').value;
+        const ctx = document.getElementById('labsChart').getContext('2d');
+        
+        if (labsChartInstance) {
+            labsChartInstance.destroy();
+        }
+        
+        if (!paramName || !globalLabsData || globalLabsData.length === 0) return;
+
+        // Extract and sort data points for the selected parameter
+        const dataPoints = [];
+        let unit = '';
+        
+        globalLabsData.forEach(report => {
+            const param = report.parameters.find(p => p.name === paramName);
+            if (param) {
+                dataPoints.push({
+                    date: new Date(report.recorded_at),
+                    value: param.value
+                });
+                if (param.unit) unit = param.unit;
+            }
+        });
+        
+        dataPoints.sort((a, b) => a.date - b.date);
+        
+        const labels = dataPoints.map(dp => dp.date.toLocaleDateString([], {month:'short', day:'numeric'}));
+        const values = dataPoints.map(dp => dp.value);
+
+        labsChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: `${paramName} ${unit ? '('+unit+')' : ''}`,
+                    data: values,
+                    borderColor: '#9d4edd',
+                    backgroundColor: 'rgba(157, 78, 221, 0.2)',
+                    tension: 0.3,
+                    fill: true,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { ticks: { maxRotation: 45, minRotation: 45 } },
+                    y: { beginAtZero: false }
+                }
+            }
+        });
+    }
+
+    document.getElementById('medicationLogDate').addEventListener('change', loadMedicationLog);
+    document.getElementById('vitalsStartDate').addEventListener('change', loadDashboard);
+    document.getElementById('vitalsEndDate').addEventListener('change', loadDashboard);
+
+    // Initialize
+    setCurrentSymptomDateTime();
+    setCurrentInterventionDateTime();
+    setMedicationLogDateToToday();
+    setVitalsDateRangeToLastWeek();
+    loadSymptoms();
+    loadInterventions();
+    loadMedicationSchedules();
+    loadMedicationLog();
+    loadDashboard();
+    loadPractitioners();
+    loadPrescriptions();
+</script>
+{% endblock %}

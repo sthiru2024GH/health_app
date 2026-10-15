@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Doctor Dashboard - HealthApp{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <h2>Doctor Dashboard</h2>
+    <p class="text-muted">Manage your patients and monitor their health trends.</p>
+</div>
+
+<div class="card">
+    <h3 class="card-title">My Patients</h3>
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+                <tr style="border-bottom: 2px solid var(--border-color);">
+                    <th style="padding: 1rem;">ID</th>
+                    <th style="padding: 1rem;">Name</th>
+                    <th style="padding: 1rem;">Action</th>
+                </tr>
+            </thead>
+            <tbody id="patientsTable">
+                <tr>
+                    <td colspan="3" class="text-center text-muted" style="padding: 2rem;">Loading patients...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div style="margin-top:2rem;" id="patientDetailView" style="display:none;">
+    <!-- Populated by JS when a patient is clicked -->
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // In a real app, we'd have a `/api/doctor/patients` endpoint. 
+    // Since we haven't built that specific aggregation, we'll mock it or add it later.
+    // For now, doctors could search by ID or we just provide an interface.
+    document.getElementById('patientsTable').innerHTML = `
+        <tr>
+            <td style="padding: 1rem;">1</td>
+            <td style="padding: 1rem;">Jane Doe</td>
+            <td style="padding: 1rem;"><button class="btn btn-outline" style="padding: 0.25rem 0.75rem;" onclick="viewPatient(1)">View Profile</button></td>
+        </tr>
+    `;
+
+    async function viewPatient(patientId) {
+        document.getElementById('patientDetailView').style.display = 'block';
+        document.getElementById('patientDetailView').innerHTML = '<div class="card"><p>Loading patient timeline...</p></div>';
+        
+        try {
+            const res = await fetch(`/api/vitals/patient/${patientId}/timeline`);
+            const data = await res.json();
+            const vitalsHtml = data.vitals.map(v => `<li>${new Date(v.recorded_at).toLocaleString()} - BP: ${v.systolic}/${v.diastolic} | Sugar: ${v.blood_sugar || '--'}</li>`).join('');
+            
+            const labsRes = await fetch(`/api/labs/patient/${patientId}`);
+            const labsData = await labsRes.json();
+            const labsHtml = (labsData.reports || []).map(r => `
+                <li style="margin-bottom:1rem;">
+                    <strong>${r.test_name}</strong> (${new Date(r.recorded_at).toLocaleDateString()})
+                    <div style="font-size:0.9rem; margin-top:0.25rem;">
+                        ${r.parameters.map(p => `<span style="background:var(--background-color); padding:2px 6px; border-radius:4px; margin-right:4px;">${p.name}: ${p.value} ${p.unit}</span>`).join('')}
+                    </div>
+                </li>
+            `).join('');
+
+            document.getElementById('patientDetailView').innerHTML = `
+                <div class="card">
+                    <h3 class="card-title">Patient #${patientId} Records</h3>
+                    <div class="grid-2">
+                        <div>
+                            <h4>Recent Vitals</h4>
+                            <ul>${vitalsHtml || '<li>No vitals recorded</li>'}</ul>
+                        </div>
+                        <div>
+                            <h4>Lab Reports</h4>
+                            <ul style="list-style:none; padding:0;">${labsHtml || '<li>No labs recorded</li>'}</ul>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } catch(e) {
+            console.error(e);
+        }
+    }
+</script>
+{% endblock %}

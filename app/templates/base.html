@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A comprehensive health parameter and medication management platform.">
+    <title>{% block title %}HealthApp{% endblock %}</title>
+    
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Custom Styles (cache busted) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ server_time_ms | default('1') }}">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    {% block head %}{% endblock %}
+</head>
+<body>
+
+    <nav class="navbar">
+        <a href="/" class="navbar-brand">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+            </svg>
+            HealthApp
+        </a>
+        <div class="nav-links">
+            <span id="realtimeClock" class="nav-link" style="font-family: monospace; font-size: 0.9rem;"></span>
+            {% if session.get('user_id') %}
+                <span class="nav-link">Welcome, {{ session.get('name', 'User') | title }}</span>
+                <a href="/dashboard" class="nav-link">Dashboard</a>
+                <a href="#" id="logoutBtn" class="nav-link">Logout</a>
+            {% else %}
+                <a href="/login" class="nav-link">Login</a>
+                <a href="/register" class="btn btn-primary" style="padding: 0.5rem 1rem;">Sign Up</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script>
+        // Real-time Server Clock
+        const serverTimeMs = {{ server_time_ms | default(0) }};
+        const clientLoadTimeMs = Date.now();
+        const timeOffset = serverTimeMs ? (serverTimeMs - clientLoadTimeMs) : 0;
+
+        function updateClock() {
+            const clockEl = document.getElementById('realtimeClock');
+            if (clockEl) {
+                const now = new Date(Date.now() + timeOffset);
+                clockEl.textContent = "Server Time: " + now.toLocaleString(undefined, {
+                    weekday: 'short', year: 'numeric', month: 'short', 
+                    day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
+                });
+            }
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Global Logout Handler
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                try {
+                    await fetch('/api/auth/logout', { method: 'POST' });
+                    window.location.href = '/login';
+                } catch (err) {
+                    console.error("Logout failed", err);
+                }
+            });
+        }
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>
