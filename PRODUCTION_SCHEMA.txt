@@ -1,0 +1,228 @@
+HEALTHAPP PRODUCTION DATABASE SCHEMA
+====================================
+
+Purpose
+-------
+This document describes the PostgreSQL schema represented by the current
+SQLAlchemy models in app/models.py. It is a reference for a clean production
+database; it is not a database dump or proof of the live Render schema.
+
+The deployed database may have started with older tables. On application
+startup, db.create_all() creates missing tables, and the legacy schema migration
+adds missing user columns and migrates legacy medication logs. Always verify the
+live database schema after deployment before relying on this document as an
+exact inventory.
+
+PostgreSQL notes
+----------------
+- SQLAlchemy Integer primary keys are shown as SERIAL to represent PostgreSQL
+  integer primary keys backed by sequences.
+- SQLAlchemy DateTime(timezone=True) is TIMESTAMP WITH TIME ZONE.
+- SQLAlchemy DateTime(timezone=False) is TIMESTAMP WITHOUT TIME ZONE.
+- Python-side SQLAlchemy defaults are noted in comments. They are applied when
+  inserts go through the application ORM; they are not necessarily database
+  DEFAULT constraints.
+- Foreign keys below use PostgreSQL's default NO ACTION behavior unless
+  otherwise noted. ORM relationship cascades do not imply database ON DELETE
+  CASCADE constraints.
+- Identifiers are unqualified; tables are created in the database connection's
+  current schema (normally public).
+
+
+TABLES
+======
+
+-- Accounts and roles. Legacy accounts may have NULL username/password_hash
+-- until an administrator assigns credentials.
+CREATE TABLE users (
+    id            SERIAL PRIMARY KEY,                    -- Internal account ID.
+    username      VARCHAR(50) UNIQUE NULL,               -- Login name; unique when supplied.
+    password_hash VARCHAR(256) NULL,                     -- Werkzeug password hash; never store plaintext.
+    name          VARCHAR(100) NOT NULL,                 -- Display name.
+    role          VARCHAR(20) NOT NULL,                  -- ORM default: 'patient'; expected roles include patient, doctor, caregiver.
+    doctor_id     INTEGER NULL REFERENCES users(id)      -- Optional assigned doctor; self-reference to users.id.
+);
+
+-- Short-lived, single-use login CAPTCHA challenges. The answer itself is not
+-- stored; only an HMAC digest is persisted.
+CREATE TABLE login_captchas (
+    id           VARCHAR(32) PRIMARY KEY,                -- Random challenge identifier.
+    answer_digest VARCHAR(64) NOT NULL,                  -- HMAC-SHA256 hex digest of the answer.
+    expires_at   INTEGER NOT NULL                        -- Unix timestamp when the challenge expires.
+);
+
+-- Patient-entered symptom records.
+CREATE TABLE symptom_entries (
+    id          SERIAL PRIMARY KEY,                      -- Symptom record ID.
+    patient_id  INTEGER NOT NULL REFERENCES users(id),   -- Patient who recorded the symptom.
+    recorded_at TIMESTAMP WITH TIME ZONE NOT NULL,       -- Date/time entered by the patient.
+    severity    VARCHAR(20) NOT NULL,                    -- UI values: mild, moderate, major, critical.
+    description TEXT NOT NULL                            -- Free-text symptom description.
+);
+
+-- Practitioners associated with a patient.
+CREATE TABLE practitioners (
+    id               SERIAL PRIMARY KEY,                 -- Practitioner record ID.
+    patient_id       INTEGER NOT NULL REFERENCES users(id), -- Owning patient.
+    name             VARCHAR(150) NOT NULL,              -- Practitioner display name.
+    specialization   VARCHAR(100) NULL,                  -- Optional specialty.
+    medical_practice VARCHAR(50) NULL                     -- Optional practice type, e.g. Allopathy/Homeopathy/Ayurvedic.
+);
+
+-- A prescription header, optionally associated with a practitioner.
+CREATE TABLE prescriptions (
+    id             SERIAL PRIMARY KEY,                   -- Prescription record ID.
+    patient_id     INTEGER NOT NULL REFERENCES users(id), -- Patient receiving the prescription.
+    practitioner_id INTEGER NULL REFERENCES practitioners(id), -- Prescribing practitioner, if selected.
+    date_issued    DATE NULL,                             -- ORM default: current UTC date.
+    notes          TEXT NULL                              -- Optional prescription notes.
+);
+
+-- Medication details belonging to a prescription.
+CREATE TABLE prescription_items (
+    id                SERIAL PRIMARY KEY,                 -- Individual prescribed medication ID.
+    prescription_id   INTEGER NOT NULL REFERENCES prescriptions(id), -- Parent prescription.
+    drug_name         VARCHAR(150) NOT NULL,              -- Medication name.
+    quantity          DOUBLE PRECISION NOT NULL,          -- Amount per scheduled dose.
+    unit              VARCHAR(50) NOT NULL,               -- Dose unit, e.g. pills or ml.
+    time_of_day       TIME WITHOUT TIME ZONE NOT NULL,    -- Daily scheduled time.
+    dependent_event   VARCHAR(50) NULL                    -- Optional meal relation/instruction.
+);
+
+-- Administration history for regular prescription items.
+CREATE TABLE medication_logs (
+    id                  SERIAL PRIMARY KEY,              -- Medication administration log ID.
+    prescription_item_id INTEGER NOT NULL REFERENCES prescription_items(id), -- Scheduled medication taken.
+    administered_at     TIMESTAMP WITH TIME ZONE NULL,    -- ORM default: current UTC time.
+    status              VARCHAR(20) NULL                 -- ORM default: 'taken'.
+);
+
+-- Patient vital readings. A reading may optionally be linked to a medication
+-- administration event.
+CREATE TABLE vital_signs (
+    id               SERIAL PRIMARY KEY,                 -- Vital reading ID.
+    patient_id       INTEGER NOT NULL REFERENCES users(id), -- Patient whose vitals were recorded.
+    recorded_at      TIMESTAMP WITH TIME ZONE NULL,       -- ORM default: current UTC time.
+    systolic_bp      INTEGER NULL,                        -- Systolic blood pressure.
+    diastolic_bp     INTEGER NULL,                        -- Diastolic blood pressure.
+    heart_rate       INTEGER NULL,                        -- Heart rate in beats per minute.
+    blood_sugar      DOUBLE PRECISION NULL,               -- Blood glucose; unit is not stored in this column.
+    temperature      DOUBLE PRECISION NULL,               -- Body temperature; unit is not stored in this column.
+    medication_log_id INTEGER NULL REFERENCES medication_logs(id) -- Optional related medication log.
+);
+
+-- Non-daily interventions linked to one practitioner and one symptom.
+CREATE TABLE interventions (
+    id               SERIAL PRIMARY KEY,                 -- Intervention plan ID.
+    patient_id       INTEGER NOT NULL REFERENCES users(id), -- Patient for whom the intervention is planned.
+    practitioner_id  INTEGER NOT NULL REFERENCES practitioners(id), -- Responsible practitioner.
+    symptom_id       INTEGER NOT NULL REFERENCES symptom_entries(id), -- Related symptom.
+    method           VARCHAR(30) NOT NULL,               -- UI values: medication, surgery, procedure, others.
+    medication_type  VARCHAR(20) NULL,                   -- For medication: one_time or periodic.
+    drug_name        VARCHAR(150) NULL,                  -- Medication name when applicable.
+    frequency_count INTEGER NULL,                         -- Number of frequency units for periodic medication.
+    frequency_unit   VARCHAR(20) NULL,                   -- Frequency unit, e.g. days/weeks/months.
+    end_date         DATE NULL,                           -- Optional end date for a periodic intervention.
+    notes            TEXT NOT NULL,                       -- ORM default: empty string.
+    created_at       TIMESTAMP WITH TIME ZONE NOT NULL    -- ORM default: current UTC time.
+);
+
+-- Dated administrations/occurrences for an intervention plan. These are
+-- separate from regular medication_logs.
+CREATE TABLE intervention_logs (
+    id               SERIAL PRIMARY KEY,                 -- Intervention administration log ID.
+    intervention_id  INTEGER NOT NULL REFERENCES interventions(id), -- Parent intervention plan.
+    administered_at  TIMESTAMP WITH TIME ZONE NOT NULL,   -- Date/time the intervention was administered.
+    notes            TEXT NOT NULL                        -- ORM default: empty string.
+);
+
+-- Patient laboratory test report header.
+CREATE TABLE lab_reports (
+    id           SERIAL PRIMARY KEY,                      -- Lab report ID.
+    patient_id   INTEGER NOT NULL REFERENCES users(id),   -- Patient associated with the report.
+    test_name    VARCHAR(150) NOT NULL,                   -- Test/report name, e.g. CBC or Lipid Profile.
+    recorded_at  TIMESTAMP WITH TIME ZONE NULL,           -- ORM default: current UTC time.
+    doctor_notes TEXT NULL                                -- Optional clinician notes.
+);
+
+-- Individual measured results belonging to a lab report.
+CREATE TABLE lab_parameters (
+    id             SERIAL PRIMARY KEY,                   -- Lab parameter ID.
+    report_id      INTEGER NOT NULL REFERENCES lab_reports(id), -- Parent lab report.
+    parameter_name VARCHAR(100) NOT NULL,                -- Result name, e.g. LDL Cholesterol.
+    value          DOUBLE PRECISION NOT NULL,             -- Numeric result.
+    unit           VARCHAR(50) NULL                       -- Optional unit, e.g. mg/dL.
+);
+
+-- Shared editable catalog of test names, e.g. CBC or Lipid Profile.
+CREATE TABLE master_lab_tests (
+    id   SERIAL PRIMARY KEY,                             -- Master test ID.
+    name VARCHAR(150) NOT NULL UNIQUE                    -- Shared test name selected when recording a lab report.
+);
+
+-- Shared parameter definitions, units, and lab-specific accepted ranges for
+-- each master test. These definitions populate the lab-result entry form.
+CREATE TABLE master_lab_parameters (
+    id         SERIAL PRIMARY KEY,                        -- Master parameter ID.
+    test_id    INTEGER NOT NULL REFERENCES master_lab_tests(id), -- Parent master test.
+    name       VARCHAR(100) NOT NULL,                     -- Parameter name displayed in the result form.
+    unit       VARCHAR(50) NOT NULL DEFAULT '',           -- Unit of measure; empty string means not specified.
+    low_range  DOUBLE PRECISION NULL,                     -- Optional lower accepted/reference limit.
+    high_range DOUBLE PRECISION NULL,                     -- Optional upper accepted/reference limit.
+    CONSTRAINT uq_master_lab_parameter_test_name UNIQUE (test_id, name) -- Avoid duplicate names within one test.
+);
+
+
+INDEXES
+-------
+
+-- SQLAlchemy creates these indexes for columns declared index=True.
+CREATE INDEX ix_login_captchas_expires_at
+    ON login_captchas (expires_at);
+CREATE INDEX ix_symptom_entries_patient_id
+    ON symptom_entries (patient_id);
+CREATE INDEX ix_symptom_entries_recorded_at
+    ON symptom_entries (recorded_at);
+CREATE INDEX ix_interventions_patient_id
+    ON interventions (patient_id);
+CREATE INDEX ix_intervention_logs_intervention_id
+    ON intervention_logs (intervention_id);
+CREATE INDEX ix_intervention_logs_administered_at
+    ON intervention_logs (administered_at);
+CREATE INDEX ix_vital_signs_recorded_at
+    ON vital_signs (recorded_at);
+CREATE INDEX ix_medication_logs_administered_at
+    ON medication_logs (administered_at);
+CREATE INDEX ix_lab_reports_recorded_at
+    ON lab_reports (recorded_at);
+CREATE INDEX ix_master_lab_parameters_test_id
+    ON master_lab_parameters (test_id);
+
+-- users.username has a unique constraint/index from the SQLAlchemy model.
+-- A legacy migration may create a unique index to enforce it on old tables.
+
+
+RELATIONSHIP SUMMARY
+====================
+
+users.doctor_id                 -> users.id
+symptom_entries.patient_id      -> users.id
+practitioners.patient_id        -> users.id
+prescriptions.patient_id        -> users.id
+prescriptions.practitioner_id   -> practitioners.id
+prescription_items.prescription_id -> prescriptions.id
+medication_logs.prescription_item_id -> prescription_items.id
+vital_signs.patient_id          -> users.id
+vital_signs.medication_log_id   -> medication_logs.id
+interventions.patient_id        -> users.id
+interventions.practitioner_id   -> practitioners.id
+interventions.symptom_id        -> symptom_entries.id
+intervention_logs.intervention_id -> interventions.id
+lab_reports.patient_id          -> users.id
+lab_parameters.report_id        -> lab_reports.id
+master_lab_parameters.test_id   -> master_lab_tests.id
+
+Application ORM relationships cascade deletion of prescription items when a
+prescription is deleted, and intervention logs when an intervention is deleted.
+These ORM cascades apply when deleting through the application; the foreign-key
+definitions above do not declare database-level ON DELETE CASCADE behavior.

@@ -4,8 +4,8 @@ from app import db
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(50), unique=True, nullable=False)
-    password_hash = db.Column(db.String(256), nullable=False)
+    username = db.Column(db.String(50), unique=True, nullable=True)
+    password_hash = db.Column(db.String(256), nullable=True)
     name = db.Column(db.String(100), nullable=False)
     role = db.Column(db.String(20), nullable=False, default='patient') # patient, doctor, caregiver
 
@@ -24,7 +24,9 @@ class User(db.Model):
 
     def check_password(self, password):
         from werkzeug.security import check_password_hash
-        return check_password_hash(self.password_hash, password)
+        return bool(self.password_hash) and check_password_hash(
+            self.password_hash, password
+        )
 
 
 class LoginCaptcha(db.Model):
@@ -140,3 +142,29 @@ class LabParameter(db.Model):
     parameter_name = db.Column(db.String(100), nullable=False) # e.g., "LDL Cholesterol"
     value = db.Column(db.Float, nullable=False)
     unit = db.Column(db.String(50), nullable=True) # e.g., "mg/dL"
+
+class MasterLabTest(db.Model):
+    __tablename__ = 'master_lab_tests'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(150), nullable=False, unique=True)
+
+    parameters = db.relationship(
+        'MasterLabParameter',
+        backref='test',
+        lazy='select',
+        cascade='all, delete-orphan',
+        order_by='MasterLabParameter.name',
+    )
+
+class MasterLabParameter(db.Model):
+    __tablename__ = 'master_lab_parameters'
+    id = db.Column(db.Integer, primary_key=True)
+    test_id = db.Column(db.Integer, db.ForeignKey('master_lab_tests.id'), nullable=False, index=True)
+    name = db.Column(db.String(100), nullable=False)
+    unit = db.Column(db.String(50), nullable=False, default='')
+    low_range = db.Column(db.Float, nullable=True)
+    high_range = db.Column(db.Float, nullable=True)
+
+    __table_args__ = (
+        db.UniqueConstraint('test_id', 'name', name='uq_master_lab_parameter_test_name'),
+    )
