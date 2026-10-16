@@ -279,6 +279,14 @@ def migrate_legacy_schema(engine, logger):
                 connection.execute(text(
                     f"ALTER TABLE prescriptions ADD COLUMN closed_at {column_type}"
                 ))
+        if "vital_signs" in tables:
+            columns = {
+                column["name"] for column in inspector.get_columns("vital_signs")
+            }
+            if "weight_kg" not in columns:
+                connection.execute(text(
+                    "ALTER TABLE vital_signs ADD COLUMN weight_kg FLOAT"
+                ))
 
     if engine.dialect.name == "postgresql":
         with engine.begin() as connection:

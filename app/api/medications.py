@@ -416,11 +416,15 @@ def get_patient_medication_logs(patient_id):
 @medications_bp.route('/log', methods=['POST'])
 @login_required
 def log_medication():
-    data = request.json
-    if not data or 'schedule_id' not in data:
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or 'schedule_id' not in data:
         return jsonify({"error": "Missing schedule_id"}), 400
 
-    item = PrescriptionItem.query.get(data['schedule_id'])
+    schedule_id = data['schedule_id']
+    if isinstance(schedule_id, bool) or not isinstance(schedule_id, int):
+        return jsonify({"error": "schedule_id must be an integer"}), 400
+
+    item = db.session.get(PrescriptionItem, schedule_id)
     if not item:
         return jsonify({"error": "Prescription Item not found"}), 404
 
@@ -430,22 +434,53 @@ def log_medication():
     if current_user_role == 'patient' and current_user_id != item.prescription.patient_id:
         return jsonify({"error": "Unauthorized"}), 403
 
-    administered_at = None
+    prescription = Prescription.query.filter_by(
+        id=item.prescription_id
+    ).with_for_update().first()
+    if not prescription or prescription.closed_at:
+        return jsonify({"error": "This prescription is no longer active."}), 409
+
+    current_prescriptions = Prescription.query.filter_by(
+        patient_id=prescription.patient_id
+    ).all()
+    latest = _latest_prescriptions_by_practitioner(current_prescriptions)
+    if latest[prescription.practitioner_id].id != prescription.id:
+        return jsonify({"error": "This prescription has been superseded."}), 409
+
+    administered_at = datetime.now(timezone.utc)
     if 'administered_at' in data and data['administered_at']:
         try:
             administered_at = datetime.fromisoformat(data['administered_at'])
             if administered_at.tzinfo is None:
                 administered_at = administered_at.replace(tzinfo=timezone.utc)
-        except ValueError:
-            pass
+            administered_at = administered_at.astimezone(timezone.utc)
+        except (TypeError, ValueError):
+            return jsonify({"error": "administered_at must be a valid ISO datetime"}), 400
+
+    status = data.get('status', 'taken')
+    if status == 'taken':
+        day_start = datetime.combine(
+            administered_at.date(), time.min, tzinfo=timezone.utc
+        )
+        next_day = day_start + timedelta(days=1)
+        existing_log = MedicationLog.query.filter(
+            MedicationLog.prescription_item_id == item.id,
+            MedicationLog.status == 'taken',
+            MedicationLog.administered_at >= day_start,
+            MedicationLog.administered_at < next_day,
+        ).first()
+        if existing_log:
+            return jsonify({
+                "message": "This medication has already been marked as taken for that date.",
+                "log_id": existing_log.id,
+                "already_recorded": True,
+            }), 200
 
     log_kwargs = {
         'prescription_item_id': item.id,
-        'status': data.get('status', 'taken')
+        'status': status,
+        'administered_at': administered_at,
     }
-
-    if administered_at:
-        log_kwargs['administered_at'] = administered_at
 
     log = MedicationLog(**log_kwargs)
     db.session.add(log)

@@ -84,6 +84,7 @@ class VitalSign(db.Model):
     heart_rate = db.Column(db.Integer, nullable=True)
     blood_sugar = db.Column(db.Float, nullable=True)
     temperature = db.Column(db.Float, nullable=True)
+    weight_kg = db.Column(db.Float, nullable=True)
     
     medication_log_id = db.Column(db.Integer, db.ForeignKey('medication_logs.id'), nullable=True)
 

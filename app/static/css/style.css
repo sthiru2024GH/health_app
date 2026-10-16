@@ -175,6 +175,7 @@ body {
 .flex { display: flex; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
 
 /* Dashboard Specific */
 .dashboard-header {
@@ -276,6 +277,11 @@ body {
         gap: 1rem;
     }
 
+    .grid-4 {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+
     .dashboard-header {
         align-items: flex-start;
         flex-direction: column;
@@ -342,6 +348,11 @@ body {
     }
 
     .grid-3 {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+
+    .grid-4 {
         grid-template-columns: 1fr;
         gap: 0.75rem;
     }

@@ -120,7 +120,7 @@
     <div style="display:flex; justify-content:flex-end; margin-bottom: 1rem;">
         <button class="btn btn-primary" onclick="openVitalsModal()">+ Log Vitals</button>
     </div>
-    <div class="grid-3 mb-4">
+    <div class="grid-4 mb-4">
         <div class="card stat-card">
             <div class="stat-value" id="lastBp">--/--</div>
             <div class="stat-label">Last Blood Pressure</div>
@@ -132,6 +132,10 @@
         <div class="card stat-card">
             <div class="stat-value" id="lastSugar">--</div>
             <div class="stat-label">Last Blood Sugar</div>
+        </div>
+        <div class="card stat-card">
+            <div class="stat-value" id="lastWeight">--</div>
+            <div class="stat-label">Last Weight (kg)</div>
         </div>
     </div>
     <div class="card">
@@ -219,6 +223,7 @@
     <div class="card" style="max-width:400px; margin: 10% auto; position:relative;">
         <h3 class="card-title">Log Vitals</h3>
         <form id="vitalsForm">
+            <div id="vitalsFormError" role="alert" style="display:none; color:var(--danger-color); margin-bottom:1rem;"></div>
             <div class="grid-2" style="gap: 1rem; margin-bottom: 0;">
                 <div class="form-group">
                     <label class="form-label">Systolic BP</label>
@@ -236,6 +241,10 @@
             <div class="form-group">
                 <label class="form-label">Blood Sugar</label>
                 <input type="number" step="0.1" id="sugar" class="form-control" placeholder="95.5">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="weightKg">Weight (kg)</label>
+                <input type="number" step="0.1" min="0.1" id="weightKg" class="form-control" placeholder="e.g., 68.5">
             </div>
             
             <div class="form-group" style="margin-top: 1rem;">
@@ -829,13 +838,14 @@
         document.getElementById('vitalsForm').reset();
     }
     
-    function showVitalDetails(dateStr, sys, dia, hr, sugar) {
+    function showVitalDetails(dateStr, sys, dia, hr, sugar, weight) {
         document.getElementById('vitalDetailModal').style.display = 'block';
         document.getElementById('vitalDetailContent').innerHTML = `
             <p><strong>Recorded At:</strong> ${dateStr}</p>
             <p><strong>Blood Pressure:</strong> ${sys || '--'} / ${dia || '--'} mmHg</p>
             <p><strong>Heart Rate:</strong> ${hr || '--'} bpm</p>
             <p><strong>Blood Sugar:</strong> ${sugar || '--'} mg/dL</p>
+            <p><strong>Weight:</strong> ${weight || '--'} kg</p>
         `;
     }
     
@@ -1105,7 +1115,7 @@
                         </div>
                         <div style="margin-top: 1rem; display: flex; gap: 0.5rem; align-items: center;">
                             <input type="datetime-local" id="medTime_${s.id}" class="form-control" style="width: auto; padding: 0.25rem 0.5rem;" title="Scheduled date and time (editable)" value="${escapeHtml(getScheduledMedicationDateTime(s.time_of_day))}">
-                            <button class="btn btn-success" style="padding:0.25rem 0.75rem;" onclick="markTaken(${s.id})">Mark Taken</button>
+                            <button type="button" class="btn btn-success" data-schedule-id="${s.id}" style="padding:0.25rem 0.75rem;" onclick="markTaken(${s.id})">Mark Taken</button>
                         </div>
                     </div>
                 `).join('');
@@ -1192,6 +1202,8 @@
                 document.getElementById('lastBp').textContent = (latest.systolic && latest.diastolic) ? `${latest.systolic}/${latest.diastolic}` : '--/--';
                 document.getElementById('lastHr').textContent = latest.heart_rate || '--';
                 document.getElementById('lastSugar').textContent = latest.blood_sugar || '--';
+                const lastWeight = [...vitals].reverse().find(v => v.weight_kg !== null && v.weight_kg !== undefined);
+                document.getElementById('lastWeight').textContent = lastWeight ? lastWeight.weight_kg : '--';
                 
                 const historyHtml = vitals.slice().reverse().map(v => {
                     const fullDateStr = new Date(v.recorded_at).toLocaleString([], {year:'numeric', month:'short', day:'numeric', hour: '2-digit', minute:'2-digit'});
@@ -1200,11 +1212,12 @@
                     if (v.systolic || v.diastolic) paramsHtml += `<div style="background:var(--background-color); padding:0.5rem 1rem; border-radius:var(--border-radius-sm);"><strong>BP:</strong> ${v.systolic || '--'}/${v.diastolic || '--'} mmHg</div>`;
                     if (v.heart_rate) paramsHtml += `<div style="background:var(--background-color); padding:0.5rem 1rem; border-radius:var(--border-radius-sm);"><strong>HR:</strong> ${v.heart_rate} bpm</div>`;
                     if (v.blood_sugar) paramsHtml += `<div style="background:var(--background-color); padding:0.5rem 1rem; border-radius:var(--border-radius-sm);"><strong>Sugar:</strong> ${v.blood_sugar} mg/dL</div>`;
+                    if (v.weight_kg !== null && v.weight_kg !== undefined) paramsHtml += `<div style="background:var(--background-color); padding:0.5rem 1rem; border-radius:var(--border-radius-sm);"><strong>Weight:</strong> ${v.weight_kg} kg</div>`;
 
                     return `
                     <div style="padding: 1rem; border: 1px solid var(--border-color); border-radius: var(--border-radius-md); margin-bottom: 1rem; cursor: pointer; transition: background 0.2s;" 
                          onmouseover="this.style.backgroundColor='#f0f4ff'" onmouseout="this.style.backgroundColor='transparent'"
-                         onclick="showVitalDetails('${fullDateStr}', ${v.systolic || 'null'}, ${v.diastolic || 'null'}, ${v.heart_rate || 'null'}, ${v.blood_sugar || 'null'})">
+                         onclick="showVitalDetails('${fullDateStr}', ${v.systolic || 'null'}, ${v.diastolic || 'null'}, ${v.heart_rate || 'null'}, ${v.blood_sugar || 'null'}, ${v.weight_kg ?? 'null'})">
                         <h4 style="margin-bottom:0.5rem; color:var(--primary-color);">Vitals Reading <span style="color:var(--text-muted); font-size:0.85rem; font-weight:normal;">(${fullDateStr})</span></h4>
                         <div style="display:flex; flex-wrap:wrap; gap:1rem;">
                             ${paramsHtml || '<div class="text-muted">No specific parameters recorded.</div>'}
@@ -1219,6 +1232,7 @@
                 document.getElementById('lastBp').textContent = '--/--';
                 document.getElementById('lastHr').textContent = '--';
                 document.getElementById('lastSugar').textContent = '--';
+                document.getElementById('lastWeight').textContent = '--';
                 document.getElementById('vitalsHistory').innerHTML = '<p class="text-muted">No vitals recorded in the selected date range.</p>';
                 renderVitalsChart([]);
             }
@@ -1276,6 +1290,9 @@
     }
 
     async function markTaken(scheduleId) {
+        const button = document.querySelector(`[data-schedule-id="${scheduleId}"]`);
+        if (!button || button.disabled) return;
+
         const timeInput = document.getElementById(`medTime_${scheduleId}`).value;
         const administeredAt = new Date(timeInput);
         if (!timeInput || Number.isNaN(administeredAt.getTime())) {
@@ -1285,6 +1302,9 @@
 
         const payload = { schedule_id: scheduleId, status: 'taken' };
         payload.administered_at = administeredAt.toISOString();
+        button.disabled = true;
+        button.setAttribute('aria-busy', 'true');
+        button.textContent = 'Saving...';
 
         try {
             const response = await fetch('/api/medications/log', {
@@ -1296,11 +1316,15 @@
             if (!response.ok) {
                 throw new Error(result.error || 'Failed to log medication');
             }
-            alert('Medication marked as taken!');
+            button.textContent = result.already_recorded ? 'Already recorded' : 'Taken';
             await Promise.all([loadMedicationSchedules(), loadMedicationLog()]);
         } catch(e) {
             console.error(e);
             alert(`Unable to log medication: ${e.message}`);
+            button.disabled = false;
+            button.textContent = 'Mark Taken';
+        } finally {
+            button.removeAttribute('aria-busy');
         }
     }
 
@@ -1637,28 +1661,57 @@
 
     document.getElementById('vitalsForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+        const form = e.currentTarget;
+        const error = document.getElementById('vitalsFormError');
+        const saveButton = form.querySelector('button[type="submit"]');
+        const fields = [
+            document.getElementById('sysBp').value,
+            document.getElementById('diaBp').value,
+            document.getElementById('hr').value,
+            document.getElementById('sugar').value,
+            document.getElementById('weightKg').value
+        ];
+        error.style.display = 'none';
+        if (fields.every(value => value === '')) {
+            error.textContent = 'Enter at least one vital measurement.';
+            error.style.display = 'block';
+            return;
+        }
+
         const recordedAt = document.getElementById('recordedAt').value;
+        const numberOrNull = value => value === '' ? null : Number(value);
         const payload = {
             patient_id: parseInt(patientId),
-            systolic: parseInt(document.getElementById('sysBp').value) || null,
-            diastolic: parseInt(document.getElementById('diaBp').value) || null,
-            heart_rate: parseInt(document.getElementById('hr').value) || null,
-            blood_sugar: parseFloat(document.getElementById('sugar').value) || null
+            systolic: numberOrNull(document.getElementById('sysBp').value),
+            diastolic: numberOrNull(document.getElementById('diaBp').value),
+            heart_rate: numberOrNull(document.getElementById('hr').value),
+            blood_sugar: numberOrNull(document.getElementById('sugar').value),
+            weight_kg: numberOrNull(document.getElementById('weightKg').value)
         };
         
         if (recordedAt) {
             payload.recorded_at = recordedAt;
         }
         
-        await fetch('/api/vitals/record', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(payload)
-        });
-        
-        closeVitalsModal();
-        loadDashboard();
+        saveButton.disabled = true;
+        saveButton.textContent = 'Saving...';
+        try {
+            const response = await fetch('/api/vitals/record', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Unable to save vital measurements');
+            closeVitalsModal();
+            await loadDashboard();
+        } catch (saveError) {
+            error.textContent = saveError.message || 'Unable to save vital measurements.';
+            error.style.display = 'block';
+        } finally {
+            saveButton.disabled = false;
+            saveButton.textContent = 'Save Log';
+        }
     });
 
     document.getElementById('labForm').addEventListener('submit', async (e) => {

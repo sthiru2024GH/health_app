@@ -109,6 +109,7 @@ CREATE TABLE vital_signs (
     heart_rate       INTEGER NULL,                        -- Heart rate in beats per minute.
     blood_sugar      DOUBLE PRECISION NULL,               -- Blood glucose; unit is not stored in this column.
     temperature      DOUBLE PRECISION NULL,               -- Body temperature; unit is not stored in this column.
+    weight_kg        DOUBLE PRECISION NULL,               -- Body weight in kilograms.
     medication_log_id INTEGER NULL REFERENCES medication_logs(id) -- Optional related medication log.
 );
 
