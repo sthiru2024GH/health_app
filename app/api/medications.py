@@ -1,5 +1,5 @@
 import math
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from flask import Blueprint, request, jsonify, session
 from sqlalchemy.orm import joinedload
 from app import db
@@ -7,6 +7,23 @@ from app.models import Practitioner, Prescription, PrescriptionItem, MedicationL
 from app.utils.decorators import login_required, require_role
 
 medications_bp = Blueprint('medications', __name__)
+
+
+def _latest_prescriptions_by_practitioner(prescriptions):
+    latest = {}
+    for prescription in prescriptions:
+        key = prescription.practitioner_id
+        current = latest.get(key)
+        if current is None or (
+            prescription.date_issued or date.min,
+            prescription.id,
+        ) > (
+            current.date_issued or date.min,
+            current.id,
+        ):
+            latest[key] = prescription
+    return latest
+
 
 # --- PRACTITIONERS ---
 @medications_bp.route('/practitioner', methods=['POST'])
@@ -100,11 +117,18 @@ def get_prescriptions(patient_id):
         return jsonify({"error": "Unauthorized"}), 403
 
     prescriptions = Prescription.query.filter_by(patient_id=patient_id).order_by(Prescription.date_issued.desc()).all()
+    latest_by_practitioner = _latest_prescriptions_by_practitioner(prescriptions)
+
     result = []
     for p in prescriptions:
         patient = db.session.get(User, p.patient_id)
         practitioner = db.session.get(Practitioner, p.practitioner_id) if p.practitioner_id else None
         items = p.items.all()
+        status = (
+            "closed" if p.closed_at
+            else "current" if latest_by_practitioner[p.practitioner_id].id == p.id
+            else "superseded"
+        )
         result.append({
             "id": p.id,
             "patient_id": p.patient_id,
@@ -113,6 +137,8 @@ def get_prescriptions(patient_id):
             "practitioner_name": practitioner.name if practitioner else None,
             "date_issued": p.date_issued.isoformat(),
             "notes": p.notes,
+            "status": status,
+            "closed_at": p.closed_at.isoformat() if p.closed_at else None,
             "items": [
                 {
                     "id": item.id,
@@ -137,6 +163,8 @@ def update_prescription(prescription_id):
 
     if session.get('role') == 'patient' and prescription.patient_id != session.get('user_id'):
         return jsonify({"error": "Unauthorized"}), 403
+    if prescription.closed_at:
+        return jsonify({"error": "A force-closed prescription cannot be edited."}), 409
 
     data = request.get_json(silent=True)
     if (
@@ -253,6 +281,30 @@ def update_prescription(prescription_id):
     return jsonify({"message": "Prescription updated"}), 200
 
 
+@medications_bp.route('/prescription/<int:prescription_id>/close', methods=['POST'])
+@login_required
+def force_close_prescription(prescription_id):
+    prescription = db.session.get(Prescription, prescription_id)
+    if not prescription:
+        return jsonify({"error": "Prescription not found"}), 404
+
+    if session.get('role') == 'patient' and prescription.patient_id != session.get('user_id'):
+        return jsonify({"error": "Unauthorized"}), 403
+
+    if prescription.closed_at:
+        return jsonify({
+            "message": "Prescription is already force-closed.",
+            "closed_at": prescription.closed_at.isoformat(),
+        }), 200
+
+    prescription.closed_at = datetime.now(timezone.utc)
+    db.session.commit()
+    return jsonify({
+        "message": "Prescription force-closed.",
+        "closed_at": prescription.closed_at.isoformat(),
+    }), 200
+
+
 @medications_bp.route('/prescription/<int:prescription_id>', methods=['DELETE'])
 @login_required
 def delete_prescription(prescription_id):
@@ -295,9 +347,19 @@ def get_patient_schedules(patient_id):
         MedicationLog.administered_at < start_of_next_day
     ).exists()
 
-    items = PrescriptionItem.query.join(Prescription).filter(
-        Prescription.patient_id == patient_id,
-        ~taken_today
+    prescriptions = Prescription.query.filter_by(patient_id=patient_id).all()
+    latest_prescriptions = _latest_prescriptions_by_practitioner(prescriptions)
+    active_prescription_ids = [
+        prescription.id
+        for prescription in latest_prescriptions.values()
+        if not prescription.closed_at
+    ]
+    items = PrescriptionItem.query.filter(
+        PrescriptionItem.prescription_id.in_(active_prescription_ids),
+        ~taken_today,
+    ).order_by(
+        PrescriptionItem.time_of_day.asc(),
+        PrescriptionItem.drug_name.asc(),
     ).all()
     schedules = [
         {

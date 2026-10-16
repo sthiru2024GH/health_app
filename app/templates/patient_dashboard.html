@@ -1387,7 +1387,7 @@
 
     function openEditPrescription(id) {
         const prescription = prescriptionsById.get(id);
-        if (!prescription) return;
+        if (!prescription || prescription.status === 'closed') return;
 
         resetPrescriptionForm();
         document.getElementById('prescriptionModalTitle').textContent = 'Edit Prescription';
@@ -1457,6 +1457,8 @@
                 <dd>${escapePrescriptionHtml(prescription.date_issued)}</dd>
                 <dt><strong>Practitioner</strong></dt>
                 <dd>${escapePrescriptionHtml(prescription.practitioner_name || 'Not specified')}</dd>
+                <dt><strong>Status</strong></dt>
+                <dd>${escapePrescriptionHtml(prescription.status || 'current')}</dd>
                 <dt><strong>Notes</strong></dt>
                 <dd>${escapePrescriptionHtml(prescription.notes || 'No notes')}</dd>
             </dl>
@@ -1586,10 +1588,15 @@
                 list.innerHTML = data.prescriptions.map(p => `
                     <div style="padding:0.75rem; border:1px solid var(--border-color); border-radius:var(--border-radius-sm); margin-bottom:0.5rem;">
                         <strong>Date:</strong> ${escapePrescriptionHtml(p.date_issued)} <br>
+                        <span style="font-size:0.85rem; color:var(--text-muted);">
+                            Practitioner: ${escapePrescriptionHtml(p.practitioner_name || 'Not specified')} ·
+                            ${p.status === 'closed' ? 'Force-closed — not scheduled' : p.status === 'superseded' ? 'Superseded — not scheduled' : 'Latest for practitioner — scheduled'}
+                        </span><br>
                         <span style="font-size:0.85rem; color:var(--text-muted);">${p.items.length} medications</span>
                         <div style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.75rem;">
                             <button type="button" class="btn btn-outline" onclick="openPrescriptionView(${p.id})">View</button>
-                            <button type="button" class="btn btn-outline" onclick="openEditPrescription(${p.id})">Edit</button>
+                            ${p.status !== 'closed' ? `<button type="button" class="btn btn-outline" onclick="openEditPrescription(${p.id})">Edit</button>` : ''}
+                            ${p.status !== 'closed' ? `<button type="button" class="btn btn-outline" style="color:var(--danger-color);" onclick="forceClosePrescription(${p.id})">Force close</button>` : ''}
                             <button type="button" class="btn btn-outline" onclick="openPrescriptionDelete(${p.id})">Delete</button>
                         </div>
                     </div>
@@ -1599,6 +1606,32 @@
             }
         } catch(e) {
             document.getElementById('prescriptionsList').textContent = e.message || 'Unable to load prescriptions.';
+        }
+    }
+
+    async function forceClosePrescription(id) {
+        const prescription = prescriptionsById.get(id);
+        if (!prescription || prescription.status === 'closed') return;
+        const practitioner = prescription.practitioner_name || 'this practitioner';
+        if (!confirm(
+            `Force close the prescription dated ${prescription.date_issued} from ${practitioner}? ` +
+            'It will no longer contribute medications to the schedule. Existing medication logs will be kept.'
+        )) return;
+
+        try {
+            const response = await fetch(`/api/medications/prescription/${id}/close`, {
+                method: 'POST'
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Unable to force close prescription');
+            await Promise.all([
+                loadPrescriptions(),
+                loadMedicationSchedules(),
+                loadMedicationLog()
+            ]);
+        } catch (error) {
+            console.error('Failed to force close prescription:', error);
+            alert(error.message || 'Unable to force close prescription.');
         }
     }
 

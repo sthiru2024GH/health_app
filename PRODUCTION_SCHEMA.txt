@@ -75,7 +75,8 @@ CREATE TABLE prescriptions (
     patient_id     INTEGER NOT NULL REFERENCES users(id), -- Patient receiving the prescription.
     practitioner_id INTEGER NULL REFERENCES practitioners(id), -- Prescribing practitioner, if selected.
     date_issued    DATE NULL,                             -- ORM default: current UTC date.
-    notes          TEXT NULL                              -- Optional prescription notes.
+    notes          TEXT NULL,                             -- Optional prescription notes.
+    closed_at      TIMESTAMP WITH TIME ZONE NULL          -- Set when force-closed; closed prescriptions are not scheduled.
 );
 
 -- Medication details belonging to a prescription.

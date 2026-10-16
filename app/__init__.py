@@ -19,6 +19,8 @@ def create_app(config_name="default"):
     with app.app_context():
         from app import models
         db.create_all()
+        from app.schema_migrations import migrate_legacy_schema
+        migrate_legacy_schema(db.engine, app.logger)
 
     # Register blueprints
     from app.api.vitals import vitals_bp

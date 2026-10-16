@@ -102,6 +102,7 @@ class Prescription(db.Model):
     practitioner_id = db.Column(db.Integer, db.ForeignKey('practitioners.id'), nullable=True)
     date_issued = db.Column(db.Date, default=lambda: datetime.now(timezone.utc).date())
     notes = db.Column(db.Text, nullable=True)
+    closed_at = db.Column(db.DateTime(timezone=True), nullable=True)
 
     items = db.relationship('PrescriptionItem', backref='prescription', lazy='dynamic', cascade="all, delete-orphan")
 
