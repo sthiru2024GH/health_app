@@ -283,6 +283,91 @@ def create_report():
     db.session.commit()
     return jsonify({"message": "Lab report created", "report_id": report.id}), 201
 
+
+@labs_bp.route('/report/<int:report_id>', methods=['PUT'])
+@login_required
+def update_report(report_id):
+    report = db.session.get(LabReport, report_id)
+    if not report:
+        return jsonify({"error": "Lab report not found."}), 404
+
+    if session.get('role') == 'patient' and session.get('user_id') != report.patient_id:
+        return jsonify({"error": "Unauthorized"}), 403
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "A JSON object is required."}), 400
+
+    test_id = data.get("test_id")
+    parameters = data.get("parameters")
+    if (
+        isinstance(test_id, bool)
+        or not isinstance(test_id, int)
+        or not isinstance(parameters, list)
+        or not parameters
+    ):
+        return jsonify({"error": "Select a test and enter at least one parameter value."}), 400
+
+    test = db.session.get(MasterLabTest, test_id)
+    if not test or test.name.casefold() != report.test_name.casefold():
+        return jsonify({"error": "The selected test does not match this lab report."}), 400
+
+    master_parameters = {parameter.id: parameter for parameter in test.parameters}
+    submitted_parameters = {}
+    for parameter in parameters:
+        if not isinstance(parameter, dict):
+            return jsonify({"error": "Invalid lab parameter data."}), 400
+        parameter_id = parameter.get("master_parameter_id")
+        value = parameter.get("value")
+        if (
+            isinstance(parameter_id, bool)
+            or not isinstance(parameter_id, int)
+            or parameter_id not in master_parameters
+            or parameter_id in submitted_parameters
+            or isinstance(value, bool)
+        ):
+            return jsonify({"error": "Select a valid parameter and enter its value."}), 400
+        try:
+            numeric_value = float(value)
+        except (TypeError, ValueError):
+            return jsonify({"error": "Parameter values must be numeric."}), 400
+        if not isfinite(numeric_value):
+            return jsonify({"error": "Parameter values must be finite numbers."}), 400
+        submitted_parameters[parameter_id] = numeric_value
+
+    recorded_at = None
+    if "recorded_at" in data:
+        try:
+            recorded_at = datetime.fromisoformat(data["recorded_at"])
+        except (TypeError, ValueError):
+            return jsonify({"error": "Recorded date and time must be valid."}), 400
+        if recorded_at.tzinfo is None:
+            recorded_at = recorded_at.replace(tzinfo=timezone.utc)
+
+    existing_parameters = {
+        parameter.parameter_name.casefold(): parameter
+        for parameter in report.parameters.all()
+    }
+    for parameter_id, value in submitted_parameters.items():
+        master_parameter = master_parameters[parameter_id]
+        existing = existing_parameters.get(master_parameter.name.casefold())
+        if existing:
+            existing.value = value
+            existing.unit = master_parameter.unit
+        else:
+            report.parameters.append(LabParameter(
+                parameter_name=master_parameter.name,
+                value=value,
+                unit=master_parameter.unit,
+            ))
+
+    if recorded_at:
+        report.recorded_at = recorded_at
+
+    db.session.commit()
+    return jsonify({"message": "Lab report updated", "report_id": report.id}), 200
+
+
 @labs_bp.route('/patient/<int:patient_id>', methods=['GET'])
 @login_required
 def get_reports(patient_id):
@@ -291,6 +376,10 @@ def get_reports(patient_id):
     
     if current_user_role == 'patient' and current_user_id != patient_id:
         return jsonify({"error": "Unauthorized"}), 403
+    if current_user_role == 'guest':
+        patient = db.session.get(User, patient_id)
+        if not patient or patient.role != 'patient':
+            return jsonify({"error": "Patient not found"}), 404
         
     reports = LabReport.query.filter_by(patient_id=patient_id).order_by(LabReport.recorded_at.desc()).all()
     
@@ -312,10 +401,17 @@ def get_reports(patient_id):
 @labs_bp.route('/parameters/unique', methods=['GET'])
 @login_required
 def get_unique_parameters():
-    # Get all distinct parameter names across all patients, ordered alphabetically
-    unique_params = db.session.query(LabParameter.parameter_name)\
-        .distinct()\
-        .order_by(LabParameter.parameter_name.asc())\
-        .all()
+    query = db.session.query(LabParameter.parameter_name).distinct()
+    if session.get('role') == 'guest':
+        try:
+            patient_id = int(request.args.get('patient_id', ''))
+        except ValueError:
+            return jsonify({"error": "Select a patient to view lab analytics"}), 400
+        patient = db.session.get(User, patient_id)
+        if not patient or patient.role != 'patient':
+            return jsonify({"error": "Patient not found"}), 404
+        query = query.join(LabReport).filter(LabReport.patient_id == patient_id)
+
+    unique_params = query.order_by(LabParameter.parameter_name.asc()).all()
     param_list = [p[0] for p in unique_params]
     return jsonify({"parameters": param_list}), 200

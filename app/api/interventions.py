@@ -3,8 +3,8 @@ from datetime import date, datetime, timezone
 from flask import Blueprint, jsonify, request, session
 
 from app import db
-from app.models import Intervention, InterventionLog, Practitioner, SymptomEntry
-from app.utils.decorators import require_role
+from app.models import Intervention, InterventionLog, Practitioner, SymptomEntry, User
+from app.utils.decorators import login_required, require_role
 
 
 interventions_bp = Blueprint('interventions', __name__)
@@ -52,10 +52,24 @@ def _parse_datetime(value):
 
 
 @interventions_bp.route('', methods=['GET'])
-@require_role('patient')
+@login_required
 def get_interventions():
+    role = session.get('role')
+    if role == 'patient':
+        patient_id = session['user_id']
+    elif role == 'guest':
+        try:
+            patient_id = int(request.args.get('patient_id', ''))
+        except ValueError:
+            return jsonify({'error': 'Select a patient to view interventions'}), 400
+        patient = db.session.get(User, patient_id)
+        if not patient or patient.role != 'patient':
+            return jsonify({'error': 'Patient not found'}), 404
+    else:
+        return jsonify({'error': 'Patient access required'}), 403
+
     plans = Intervention.query.filter_by(
-        patient_id=session['user_id']
+        patient_id=patient_id
     ).order_by(Intervention.created_at.desc()).all()
     return jsonify({'interventions': [_serialize_intervention(plan) for plan in plans]}), 200
 

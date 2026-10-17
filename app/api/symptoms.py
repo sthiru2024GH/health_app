@@ -3,8 +3,8 @@ from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request, session
 
 from app import db
-from app.models import SymptomEntry
-from app.utils.decorators import require_role
+from app.models import SymptomEntry, User
+from app.utils.decorators import login_required, require_role
 
 
 symptoms_bp = Blueprint('symptoms', __name__)
@@ -12,10 +12,24 @@ SEVERITIES = {'mild', 'moderate', 'major', 'critical'}
 
 
 @symptoms_bp.route('', methods=['GET'])
-@require_role('patient')
+@login_required
 def get_symptoms():
+    role = session.get('role')
+    if role == 'patient':
+        patient_id = session['user_id']
+    elif role == 'guest':
+        try:
+            patient_id = int(request.args.get('patient_id', ''))
+        except ValueError:
+            return jsonify({'error': 'Select a patient to view symptoms'}), 400
+        patient = db.session.get(User, patient_id)
+        if not patient or patient.role != 'patient':
+            return jsonify({'error': 'Patient not found'}), 404
+    else:
+        return jsonify({'error': 'Patient access required'}), 403
+
     entries = SymptomEntry.query.filter_by(
-        patient_id=session['user_id']
+        patient_id=patient_id
     ).order_by(SymptomEntry.recorded_at.desc()).all()
 
     return jsonify({

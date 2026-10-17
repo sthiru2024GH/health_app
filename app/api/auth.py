@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, session
 from app.models import User
 from app import db
 from app.utils.captcha import create_login_captcha, verify_login_captcha
+from app.utils.decorators import login_required
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -16,6 +17,10 @@ def register():
     data = request.get_json()
     if not data or not data.get('username') or not data.get('password') or not data.get('name'):
         return jsonify({"error": "Missing required fields"}), 400
+
+    role = data.get('role', 'patient')
+    if not isinstance(role, str) or role not in {'patient', 'doctor'}:
+        return jsonify({"error": "Select a valid account type"}), 400
         
     if User.query.filter_by(username=data['username']).first():
         return jsonify({"error": "Username already exists"}), 400
@@ -23,7 +28,7 @@ def register():
     user = User(
         username=data['username'],
         name=data['name'],
-        role=data.get('role', 'patient')
+        role=role
     )
     user.set_password(data['password'])
     
@@ -75,6 +80,19 @@ def logout():
     session.pop('role', None)
     session.pop('name', None)
     return jsonify({"message": "Logged out successfully"}), 200
+
+
+@auth_bp.route('/patients', methods=['GET'])
+@login_required
+def list_patients():
+    if session.get('role') != 'guest':
+        return jsonify({"error": "Guest access required"}), 403
+
+    patients = User.query.filter_by(role='patient').order_by(User.name.asc(), User.id.asc()).all()
+    return jsonify({
+        "patients": [{"id": patient.id, "name": patient.name} for patient in patients]
+    }), 200
+
 
 @auth_bp.route('/me', methods=['GET'])
 def get_current_user():

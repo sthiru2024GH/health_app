@@ -25,6 +25,17 @@ def _latest_prescriptions_by_practitioner(prescriptions):
     return latest
 
 
+def _patient_read_error(patient_id):
+    role = session.get('role')
+    if role == 'patient' and session.get('user_id') != patient_id:
+        return jsonify({"error": "Unauthorized"}), 403
+    if role == 'guest':
+        patient = db.session.get(User, patient_id)
+        if not patient or patient.role != 'patient':
+            return jsonify({"error": "Patient not found"}), 404
+    return None
+
+
 # --- PRACTITIONERS ---
 @medications_bp.route('/practitioner', methods=['POST'])
 @login_required
@@ -51,10 +62,9 @@ def create_practitioner():
 @medications_bp.route('/practitioners/patient/<int:patient_id>', methods=['GET'])
 @login_required
 def get_practitioners(patient_id):
-    current_user_id = session.get('user_id')
-    current_user_role = session.get('role')
-    if current_user_role == 'patient' and current_user_id != patient_id:
-        return jsonify({"error": "Unauthorized"}), 403
+    access_error = _patient_read_error(patient_id)
+    if access_error:
+        return access_error
 
     practitioners = Practitioner.query.filter_by(patient_id=patient_id).all()
     return jsonify({
@@ -111,10 +121,9 @@ def create_prescription():
 @medications_bp.route('/prescriptions/patient/<int:patient_id>', methods=['GET'])
 @login_required
 def get_prescriptions(patient_id):
-    current_user_id = session.get('user_id')
-    current_user_role = session.get('role')
-    if current_user_role == 'patient' and current_user_id != patient_id:
-        return jsonify({"error": "Unauthorized"}), 403
+    access_error = _patient_read_error(patient_id)
+    if access_error:
+        return access_error
 
     prescriptions = Prescription.query.filter_by(patient_id=patient_id).order_by(Prescription.date_issued.desc()).all()
     latest_by_practitioner = _latest_prescriptions_by_practitioner(prescriptions)
@@ -331,11 +340,9 @@ def delete_prescription(prescription_id):
 @medications_bp.route('/schedule/patient/<int:patient_id>', methods=['GET'])
 @login_required
 def get_patient_schedules(patient_id):
-    current_user_role = session.get('role')
-    current_user_id = session.get('user_id')
-
-    if current_user_role == 'patient' and current_user_id != patient_id:
-        return jsonify({"error": "Unauthorized"}), 403
+    access_error = _patient_read_error(patient_id)
+    if access_error:
+        return access_error
 
     today = datetime.now(timezone.utc).date()
     start_of_day = datetime.combine(today, time.min, tzinfo=timezone.utc)
@@ -379,10 +386,9 @@ def get_patient_schedules(patient_id):
 @medications_bp.route('/logs/patient/<int:patient_id>', methods=['GET'])
 @login_required
 def get_patient_medication_logs(patient_id):
-    current_user_role = session.get('role')
-    current_user_id = session.get('user_id')
-    if current_user_role == 'patient' and current_user_id != patient_id:
-        return jsonify({"error": "Unauthorized"}), 403
+    access_error = _patient_read_error(patient_id)
+    if access_error:
+        return access_error
 
     date_str = request.args.get('date')
     try:

@@ -17,7 +17,7 @@
     
     {% block head %}{% endblock %}
 </head>
-<body>
+<body class="{{ 'guest-read-only' if session.get('role') == 'guest' else '' }}">
 
     <nav class="navbar">
         <a href="/" class="navbar-brand">

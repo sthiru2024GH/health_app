@@ -247,6 +247,15 @@ body {
     display: block;
     animation: fadeIn 0.3s ease-in-out;
 }
+
+.guest-read-only .guest-write-control,
+.guest-read-only form,
+.guest-read-only #medsList button,
+.guest-read-only #medsList input,
+.guest-read-only #masterHealthTestForm {
+    display: none !important;
+}
+
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(5px); }
     to { opacity: 1; transform: translateY(0); }

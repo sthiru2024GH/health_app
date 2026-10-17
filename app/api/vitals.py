@@ -94,9 +94,17 @@ def record_vitals():
     db.session.commit()
     return jsonify({"status": "success", "vital_id": vital_entry.id}), 201
 
+
 @vitals_bp.route('/patient/<int:patient_id>/timeline', methods=['GET'])
 @login_required
 def patient_timeline(patient_id):
+    if session.get('role') == 'patient' and session.get('user_id') != patient_id:
+        return jsonify({"error": "Unauthorized"}), 403
+    if session.get('role') == 'guest':
+        patient = db.session.get(User, patient_id)
+        if not patient or patient.role != 'patient':
+            return jsonify({"error": "Patient not found"}), 404
+
     start_date_str = request.args.get('start_date')
     end_date_str = request.args.get('end_date')
     date_str = request.args.get('date')

@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, jsonify, request, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from config import config
@@ -38,6 +38,15 @@ def create_app(config_name="default"):
     app.register_blueprint(symptoms_bp, url_prefix="/api/symptoms")
     app.register_blueprint(interventions_bp, url_prefix="/api/interventions")
     app.register_blueprint(main_bp)
+
+    @app.before_request
+    def enforce_guest_read_only():
+        if (
+            session.get("role") == "guest"
+            and request.method not in {"GET", "HEAD", "OPTIONS"}
+            and request.endpoint != "auth.logout"
+        ):
+            return jsonify({"error": "Guest accounts have read-only access."}), 403
 
     # Context processor to inject server time to all templates
     @app.context_processor

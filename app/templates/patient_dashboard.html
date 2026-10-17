@@ -287,8 +287,9 @@
 <!-- Log Lab Modal -->
 <div id="labModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
     <div class="card guest-write-control" style="max-width:500px; margin: 5% auto; position:relative;">
-        <h3 class="card-title">Log Lab Test</h3>
+        <h3 id="labModalTitle" class="card-title">Log Lab Test</h3>
         <form id="labForm">
+            <input type="hidden" id="labTestId">
             <div class="form-group">
                 <label class="form-label" for="labTestName">Test Name</label>
                 <select id="labTestName" class="form-control" required>
@@ -307,9 +308,19 @@
             
             <div style="display:flex; justify-content:flex-end; gap:1rem; margin-top:2rem;">
                 <button type="button" class="btn btn-outline" onclick="closeLabModal()">Cancel</button>
-                <button type="submit" class="btn btn-primary">Save Report</button>
+                <button id="labFormSubmit" type="submit" class="btn btn-primary">Save Report</button>
             </div>
         </form>
+    </div>
+</div>
+
+<div id="labReportDetailsModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
+    <div class="card" style="max-width:600px; margin:5% auto; position:relative;">
+        <h3 id="labReportDetailsTitle" class="card-title">Lab Test Details</h3>
+        <div id="labReportDetailsContent"></div>
+        <div style="display:flex; justify-content:flex-end; margin-top:1rem;">
+            <button type="button" class="btn btn-outline" onclick="closeLabReportDetails()">Close</button>
+        </div>
     </div>
 </div>
 
@@ -877,7 +888,15 @@
         const panel = document.getElementById('masterHealthParametersPanel');
         const isOpening = panel.style.display === 'none';
         panel.style.display = isOpening ? 'block' : 'none';
-        if (isOpening) loadMasterLabTests();
+        if (isOpening) {
+            loadMasterLabTests().finally(() => focusMasterLabTestName());
+        }
+    }
+
+    function focusMasterLabTestName() {
+        const input = document.getElementById('masterLabTestName');
+        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        input.focus({ preventScroll: true });
     }
 
     async function loadMasterLabTests() {
@@ -970,7 +989,7 @@
         renderMasterLabUnitOptions();
     }
 
-    function addLabParameterRow(parameterId = '') {
+    function addLabParameterRow(parameterId = '', value = '') {
         const row = document.createElement('div');
         row.className = 'lab-param-row';
         row.style.cssText = 'display:grid; grid-template-columns:minmax(10rem, 2fr) minmax(6rem, 1fr) minmax(5rem, 0.8fr); gap:0.5rem; align-items:start;';
@@ -996,6 +1015,7 @@
         }
         select.value = String(parameterId || '');
         select.addEventListener('change', () => updateLabParameterDetails(row));
+        row.querySelector('.param-value').value = value;
         document.getElementById('labParamsContainer').appendChild(row);
         updateLabParameterDetails(row);
     }
@@ -1014,7 +1034,7 @@
         low === '' && high === '' ? 'Accepted range not specified' : `Accepted range: ${low === '' ? '—' : low} to ${high === '' ? '—' : high}`;
     }
 
-    function renderLabParameterRows() {
+    function renderLabParameterRows(existingParameters = []) {
         const container = document.getElementById('labParamsContainer');
         container.replaceChildren();
         const test = masterLabTests.find(item => String(item.id) === document.getElementById('labTestName').value);
@@ -1022,7 +1042,12 @@
             container.innerHTML = '<p class="text-muted">No parameters are set up for this test.</p>';
             return;
         }
-        addLabParameterRow();
+        test.parameters.forEach(parameter => {
+            const existing = existingParameters.find(item =>
+                item.name.toLocaleLowerCase() === parameter.name.toLocaleLowerCase()
+            );
+            addLabParameterRow(parameter.id, existing?.value ?? '');
+        });
     }
 
     async function openLabModal() {
@@ -1031,14 +1056,78 @@
             alert('Add a test and its health parameters under Master Health Parameters first.');
             return;
         }
+        resetLabForm();
         document.getElementById('labModal').style.display = 'block';
+        const testSelect = document.getElementById('labTestName');
+        testSelect.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        testSelect.focus({ preventScroll: true });
+    }
+
+    function resetLabForm() {
+        document.getElementById('labForm').reset();
+        document.getElementById('labTestId').value = '';
+        document.getElementById('labModalTitle').textContent = 'Log Lab Test';
+        document.getElementById('labFormSubmit').textContent = 'Save Report';
+        document.getElementById('labTestName').disabled = false;
+        document.getElementById('labParamsContainer').innerHTML =
+            '<p class="text-muted">Select a test to choose its parameters.</p>';
     }
 
     function closeLabModal() {
         document.getElementById('labModal').style.display = 'none';
-        document.getElementById('labForm').reset();
-        document.getElementById('labParamsContainer').innerHTML =
-            '<p class="text-muted">Select a test to choose its parameters.</p>';
+        resetLabForm();
+    }
+
+    function showLabReport(reportId) {
+        const report = globalLabsData.find(item => item.id === reportId);
+        if (!report) return;
+        document.getElementById('labReportDetailsTitle').textContent = report.test_name;
+        document.getElementById('labReportDetailsContent').innerHTML = `
+            <p><strong>Recorded:</strong> ${escapeHtml(new Date(report.recorded_at).toLocaleString())}</p>
+            <div style="display:grid; gap:0.5rem;">
+                ${report.parameters.map(parameter => `
+                    <div style="background:var(--background-color); padding:0.75rem 1rem; border-radius:var(--border-radius-sm);">
+                        <strong>${escapeHtml(parameter.name)}:</strong>
+                        ${escapeHtml(String(parameter.value))} ${escapeHtml(parameter.unit || '')}
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        document.getElementById('labReportDetailsModal').style.display = 'block';
+    }
+
+    function closeLabReportDetails() {
+        document.getElementById('labReportDetailsModal').style.display = 'none';
+    }
+
+    async function editLabReport(reportId) {
+        const report = globalLabsData.find(item => item.id === reportId);
+        if (!report) return;
+        if (masterLabTests.length === 0) await loadMasterLabTests();
+        const test = masterLabTests.find(item => item.name.toLocaleLowerCase() === report.test_name.toLocaleLowerCase());
+        if (!test) {
+            alert('This report no longer matches a test in Master Health Parameters, so it cannot be edited.');
+            return;
+        }
+
+        resetLabForm();
+        document.getElementById('labTestId').value = report.id;
+        document.getElementById('labModalTitle').textContent = `Continue ${report.test_name} Results`;
+        document.getElementById('labFormSubmit').textContent = 'Save Results';
+        const testSelect = document.getElementById('labTestName');
+        testSelect.value = String(test.id);
+        testSelect.disabled = true;
+        const recordedAt = new Date(report.recorded_at);
+        document.getElementById('labRecordedAt').value = new Date(
+            recordedAt.getTime() - recordedAt.getTimezoneOffset() * 60000
+        ).toISOString().slice(0, 16);
+        renderLabParameterRows(report.parameters);
+        document.getElementById('labModal').style.display = 'block';
+        const firstEmptyValue = Array.from(document.querySelectorAll('.lab-param-row .param-value'))
+            .find(input => input.value === '');
+        const focusTarget = firstEmptyValue || testSelect;
+        focusTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        focusTarget.focus({ preventScroll: true });
     }
 
     function resetMasterLabTestForm() {
@@ -1063,6 +1152,7 @@
         container.replaceChildren();
         test.parameters.forEach(parameter => addMasterLabParameterRow(parameter));
         document.getElementById('masterHealthParametersPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        focusMasterLabTestName();
     }
 
     document.getElementById('masterHealthTestForm').addEventListener('submit', async (event) => {
@@ -1291,7 +1381,13 @@
             if (globalLabsData.length > 0) {
                 const labsHtml = globalLabsData.map(r => `
                     <div style="padding: 1rem; border: 1px solid var(--border-color); border-radius: var(--border-radius-md); margin-bottom: 1rem;">
-                        <h4 style="margin-bottom:0.5rem; color:var(--primary-color);">${escapeHtml(r.test_name)} <span style="color:var(--text-muted); font-size:0.85rem; font-weight:normal;">(${new Date(r.recorded_at).toLocaleDateString()})</span></h4>
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.75rem; flex-wrap:wrap; margin-bottom:0.5rem;">
+                            <h4 style="margin:0; color:var(--primary-color);">${escapeHtml(r.test_name)} <span style="color:var(--text-muted); font-size:0.85rem; font-weight:normal;">(${new Date(r.recorded_at).toLocaleDateString()})</span></h4>
+                            <div style="display:flex; gap:0.5rem;">
+                                <button type="button" class="btn btn-outline" onclick="showLabReport(${r.id})">View</button>
+                                ${!isGuest ? `<button type="button" class="btn btn-outline" onclick="editLabReport(${r.id})">Edit</button>` : ''}
+                            </div>
+                        </div>
                         <div style="display:flex; flex-wrap:wrap; gap:1rem;">
                             ${r.parameters.map(p => `
                                 <div style="background:var(--background-color); padding:0.5rem 1rem; border-radius:var(--border-radius-sm);">
@@ -1776,11 +1872,12 @@
             return;
         }
 
+        const reportId = document.getElementById('labTestId').value;
         const payload = {
-            patient_id: Number(patientId),
             test_id: Number(document.getElementById('labTestName').value),
             parameters: params
         };
+        if (!reportId) payload.patient_id = Number(patientId);
         
         const recordedAt = document.getElementById('labRecordedAt').value;
         if (recordedAt) {
@@ -1788,11 +1885,14 @@
         }
 
         try {
-            const response = await fetch('/api/labs/report', {
-                method: 'POST',
+            const response = await fetch(
+                reportId ? `/api/labs/report/${reportId}` : '/api/labs/report',
+                {
+                method: reportId ? 'PUT' : 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(payload)
-            });
+                }
+            );
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'Unable to save lab report');
             closeLabModal();

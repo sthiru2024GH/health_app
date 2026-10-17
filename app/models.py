@@ -7,7 +7,7 @@ class User(db.Model):
     username = db.Column(db.String(50), unique=True, nullable=True)
     password_hash = db.Column(db.String(256), nullable=True)
     name = db.Column(db.String(100), nullable=False)
-    role = db.Column(db.String(20), nullable=False, default='patient') # patient, doctor, caregiver
+    role = db.Column(db.String(20), nullable=False, default='patient') # patient, doctor, caregiver, guest
 
     # Relationships
     doctor_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
