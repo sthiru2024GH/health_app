@@ -4,8 +4,18 @@
 
 {% block content %}
 <div class="dashboard-header" style="align-items: center;">
-    <h2>My Dashboard</h2>
+    <h2>{{ 'Guest Read-only View' if session.get('role') == 'guest' else 'My Dashboard' }}</h2>
 </div>
+
+{% if session.get('role') == 'guest' %}
+<div class="card mb-4" id="guestPatientPicker">
+    <label class="form-label" for="guestPatientSelect">Select a patient to view</label>
+    <select id="guestPatientSelect" class="form-control">
+        <option value="">Loading patients...</option>
+    </select>
+    <p class="text-muted" style="margin-top:0.5rem;">Guest accounts can view patient records but cannot make changes.</p>
+</div>
+{% endif %}
 
 <div class="tab-menu">
     <button type="button" class="tab-btn" onclick="switchTab('symptomsTab', this)">Symptoms</button>
@@ -42,7 +52,7 @@
 
 <!-- SYMPTOMS TAB -->
 <div id="symptomsTab" class="tab-content">
-    <div class="card">
+    <div class="card guest-write-control">
         <h3 class="card-title">Record Symptoms</h3>
         <div id="symptomFormError" role="alert" style="display:none; color:var(--danger-color); margin-bottom:1rem;"></div>
         <form id="symptomForm">
@@ -79,17 +89,17 @@
 
 <!-- PRESCRIPTIONS TAB -->
 <div id="prescriptionsTab" class="tab-content">
-    <div style="display:flex; justify-content:flex-end; gap:1rem; margin-bottom:1rem;">
+    <div class="guest-write-control" style="display:flex; justify-content:flex-end; gap:1rem; margin-bottom:1rem;">
         <button class="btn btn-outline" onclick="openPractitionerModal()">+ Add Practitioner</button>
         <button class="btn btn-primary" onclick="openPrescriptionModal()">+ Add Prescription</button>
     </div>
     <div class="grid-2 mb-4" style="gap:1rem;">
         <div class="card">
-            <h3 class="card-title">My Practitioners</h3>
+            <h3 class="card-title">{{ 'Practitioners' if session.get('role') == 'guest' else 'My Practitioners' }}</h3>
             <div id="practitionersList"><p class="text-muted">Loading...</p></div>
         </div>
         <div class="card">
-            <h3 class="card-title">My Prescriptions</h3>
+            <h3 class="card-title">{{ 'Prescriptions' if session.get('role') == 'guest' else 'My Prescriptions' }}</h3>
             <div id="prescriptionsList"><p class="text-muted">Loading...</p></div>
         </div>
     </div>
@@ -97,7 +107,7 @@
 
 <!-- INTERVENTIONS TAB -->
 <div id="interventionsTab" class="tab-content">
-    <div style="display:flex; justify-content:flex-end; gap:1rem; margin-bottom:1rem;">
+    <div class="guest-write-control" style="display:flex; justify-content:flex-end; gap:1rem; margin-bottom:1rem;">
         <div>
             <label class="form-label" for="interventionMethod" style="margin-bottom:0.25rem;">Add Interventions</label>
             <select id="interventionMethod" class="form-control" aria-label="Add Interventions method" onchange="openInterventionForm(this.value)">
@@ -117,7 +127,7 @@
 
 <!-- VITALS TAB -->
 <div id="vitalsTab" class="tab-content">
-    <div style="display:flex; justify-content:flex-end; margin-bottom: 1rem;">
+    <div class="guest-write-control" style="display:flex; justify-content:flex-end; margin-bottom: 1rem;">
         <button class="btn btn-primary" onclick="openVitalsModal()">+ Log Vitals</button>
     </div>
     <div class="grid-4 mb-4">
@@ -162,13 +172,14 @@
 <div id="labsTab" class="tab-content">
     <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-bottom: 1rem;">
         <button type="button" class="btn btn-outline" onclick="toggleMasterHealthParameters()">Master Health Parameters</button>
-        <button class="btn btn-outline" onclick="openLabModal()">+ Log Lab Test</button>
+        <button class="btn btn-outline guest-write-control" onclick="openLabModal()">+ Log Lab Test</button>
     </div>
     <div id="masterHealthParametersPanel" class="card mb-4" style="display:none;">
         <h3 class="card-title">Master Health Parameters</h3>
         <p class="text-muted">Maintain the shared test and parameter list. Enter the reference ranges from your laboratory; ranges may vary by lab and patient.</p>
         <div id="masterLabTestError" role="alert" class="text-danger" style="display:none; margin-bottom:0.75rem;"></div>
         <div id="masterLabTestsList"><p class="text-muted">Loading master tests...</p></div>
+        <datalist id="masterLabUnits"></datalist>
         <form id="masterHealthTestForm" style="border-top:1px solid var(--border-color); padding-top:1rem; margin-top:1rem;">
             <input type="hidden" id="masterLabTestId">
             <h4 id="masterHealthTestFormTitle">Add a test</h4>
@@ -220,7 +231,7 @@
 
 <!-- Simple inline modal for logging vitals -->
 <div id="vitalsModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;">
-    <div class="card" style="max-width:400px; margin: 10% auto; position:relative;">
+    <div class="card guest-write-control" style="max-width:400px; margin: 10% auto; position:relative;">
         <h3 class="card-title">Log Vitals</h3>
         <form id="vitalsForm">
             <div id="vitalsFormError" role="alert" style="display:none; color:var(--danger-color); margin-bottom:1rem;"></div>
@@ -275,7 +286,7 @@
 
 <!-- Log Lab Modal -->
 <div id="labModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
-    <div class="card" style="max-width:500px; margin: 5% auto; position:relative;">
+    <div class="card guest-write-control" style="max-width:500px; margin: 5% auto; position:relative;">
         <h3 class="card-title">Log Lab Test</h3>
         <form id="labForm">
             <div class="form-group">
@@ -304,7 +315,7 @@
 
 <!-- Practitioner Modal -->
 <div id="practitionerModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;">
-    <div class="card" style="max-width:400px; margin: 10% auto; position:relative;">
+    <div class="card guest-write-control" style="max-width:400px; margin: 10% auto; position:relative;">
         <h3 class="card-title">Add Practitioner</h3>
         <form id="practitionerForm">
             <div class="form-group">
@@ -333,7 +344,7 @@
 
 <!-- Prescription Modal -->
 <div id="prescriptionModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
-    <div class="card" style="max-width:600px; margin: 5% auto; position:relative;">
+    <div class="card guest-write-control" style="max-width:600px; margin: 5% auto; position:relative;">
         <h3 class="card-title" id="prescriptionModalTitle">Add Prescription</h3>
         <form id="prescriptionForm">
             <input type="hidden" id="prescId">
@@ -380,7 +391,7 @@
 </div>
 
 <div id="interventionModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
-    <div class="card" style="max-width:600px; margin:5% auto;">
+    <div class="card guest-write-control" style="max-width:600px; margin:5% auto;">
         <h3 class="card-title">Add Intervention</h3>
         <div id="interventionFormError" role="alert" style="display:none; color:var(--danger-color); margin-bottom:1rem;"></div>
         <form id="interventionForm">
@@ -449,7 +460,7 @@
 </div>
 
 <div id="interventionAdministeredModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1001; overflow-y:auto;">
-    <div class="card" style="max-width:500px; margin:10% auto;">
+    <div class="card guest-write-control" style="max-width:500px; margin:10% auto;">
         <h3 class="card-title" id="interventionAdministeredTitle">Record Administration</h3>
         <div id="interventionAdministeredError" role="alert" style="display:none; color:var(--danger-color); margin-bottom:1rem;"></div>
         <form id="interventionAdministeredForm">
@@ -490,7 +501,7 @@
 </div>
 
 <div id="prescriptionDeleteModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
-    <div class="card" style="max-width:450px; margin:10% auto;">
+    <div class="card guest-write-control" style="max-width:450px; margin:10% auto;">
         <h3 class="card-title">Delete Prescription</h3>
         <p id="prescriptionDeleteMessage"></p>
         <div id="prescriptionDeleteError" role="alert" style="display:none; color:var(--danger-color); margin-top:1rem;"></div>
@@ -505,7 +516,8 @@
 
 {% block scripts %}
 <script>
-    const patientId = "{{ session.get('user_id') }}";
+    const isGuest = {{ (session.get('role') == 'guest') | tojson }};
+    let patientId = "{{ '' if session.get('role') == 'guest' else session.get('user_id') }}";
     const symptomsUrl = "{{ url_for('symptoms.get_symptoms') }}";
     const createSymptomUrl = "{{ url_for('symptoms.create_symptom') }}";
     let vitalsChartInstance = null;
@@ -558,9 +570,13 @@
     }
 
     async function loadSymptoms() {
+        if (isGuest && !patientId) return;
         const list = document.getElementById('symptomsList');
         try {
-            const response = await fetch(symptomsUrl, {
+            const endpoint = isGuest
+                ? `${symptomsUrl}?patient_id=${encodeURIComponent(patientId)}`
+                : symptomsUrl;
+            const response = await fetch(endpoint, {
                 headers: {'Accept': 'application/json'}
             });
             const data = await readSymptomsResponse(response);
@@ -710,9 +726,13 @@
     }
 
     async function loadInterventions() {
+        if (isGuest && !patientId) return;
         const list = document.getElementById('interventionsList');
         try {
-            const response = await fetch('/api/interventions');
+            const endpoint = isGuest
+                ? `/api/interventions?patient_id=${encodeURIComponent(patientId)}`
+                : '/api/interventions';
+            const response = await fetch(endpoint);
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'Unable to load interventions');
 
@@ -726,9 +746,9 @@
             list.innerHTML = data.interventions.map(plan => `
                 <article style="padding:1rem; border:1px solid var(--border-color); border-radius:var(--border-radius-md); margin-bottom:1rem;">
                     ${interventionPlanDetails(plan)}
-                    <div style="margin:0.75rem 0;">
+                    ${!isGuest ? `<div style="margin:0.75rem 0;">
                         <button type="button" class="btn btn-primary" onclick="openInterventionLogForm(${plan.id})">Administered</button>
-                    </div>
+                    </div>` : ''}
                     <h4 style="margin:1rem 0 0.5rem;">Administration history</h4>
                     ${plan.logs.length ? plan.logs.map(log => `
                         <div style="padding:0.75rem 0; border-top:1px solid var(--border-color);">
@@ -736,7 +756,7 @@
                             ${log.notes ? `<p>${escapeHtml(log.notes)}</p>` : ''}
                             <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
                                 <button type="button" class="btn btn-outline" onclick="viewInterventionLog(${plan.id}, ${log.id})">View</button>
-                                <button type="button" class="btn btn-outline" onclick="editInterventionLog(${plan.id}, ${log.id})">Edit</button>
+                                ${!isGuest ? `<button type="button" class="btn btn-outline" onclick="editInterventionLog(${plan.id}, ${log.id})">Edit</button>` : ''}
                             </div>
                         </div>
                     `).join('') : '<p class="text-muted">No administration recorded yet.</p>'}
@@ -867,6 +887,7 @@
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'Unable to load master lab tests');
             masterLabTests = data.tests || [];
+            renderMasterLabUnitOptions();
 
             const testSelect = document.getElementById('labTestName');
             const selectedTestId = testSelect.value;
@@ -888,10 +909,10 @@
                 <div style="padding:0.75rem 0; border-bottom:1px solid var(--border-color);">
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:0.75rem; flex-wrap:wrap;">
                         <strong>${escapeHtml(test.name)}</strong>
-                        <div style="display:flex; gap:0.5rem;">
+                        ${!isGuest ? `<div style="display:flex; gap:0.5rem;">
                             <button type="button" class="btn btn-outline" onclick="editMasterLabTest(${test.id})">Edit</button>
                             <button type="button" class="btn btn-outline" onclick="deleteMasterLabTest(${test.id})">Delete</button>
-                        </div>
+                        </div>` : ''}
                     </div>
                     <div class="text-muted" style="margin-top:0.25rem;">
                         ${test.parameters.map(parameter =>
@@ -904,6 +925,26 @@
             console.error('Failed to load master lab tests:', error);
             list.innerHTML = '<p class="text-danger">Unable to load master health parameters.</p>';
         }
+    }
+
+    function renderMasterLabUnitOptions() {
+        const units = new Map();
+        masterLabTests.forEach(test => test.parameters.forEach(parameter => {
+            const unit = parameter.unit?.trim();
+            if (unit && !units.has(unit.toLocaleLowerCase())) {
+                units.set(unit.toLocaleLowerCase(), unit);
+            }
+        }));
+        document.querySelectorAll('.master-param-unit').forEach(input => {
+            const unit = input.value.trim();
+            if (unit && !units.has(unit.toLocaleLowerCase())) {
+                units.set(unit.toLocaleLowerCase(), unit);
+            }
+        });
+        document.getElementById('masterLabUnits').innerHTML = Array.from(units.values())
+            .sort((left, right) => left.localeCompare(right))
+            .map(unit => `<option value="${escapeHtml(unit)}"></option>`)
+            .join('');
     }
 
     function formatLabRange(parameter) {
@@ -919,12 +960,14 @@
         row.style.cssText = 'display:grid; grid-template-columns:repeat(auto-fit, minmax(7rem, 1fr)) auto; gap:0.5rem; margin-bottom:0.5rem; align-items:center;';
         row.innerHTML = `
             <input type="text" class="form-control master-param-name" maxlength="100" placeholder="Parameter name" value="${escapeHtml(parameter.name || '')}" required>
-            <input type="text" class="form-control master-param-unit" maxlength="50" placeholder="Unit" value="${escapeHtml(parameter.unit || '')}">
+            <input type="text" class="form-control master-param-unit" list="masterLabUnits" maxlength="50" placeholder="Unit (select or enter)" value="${escapeHtml(parameter.unit || '')}">
             <input type="number" step="any" class="form-control master-param-low" placeholder="Low range" value="${parameter.low_range ?? ''}">
             <input type="number" step="any" class="form-control master-param-high" placeholder="High range" value="${parameter.high_range ?? ''}">
             <button type="button" class="btn btn-outline" aria-label="Remove parameter" onclick="this.closest('.master-lab-parameter-row').remove()">Remove</button>
         `;
         document.getElementById('masterLabParametersContainer').appendChild(row);
+        row.querySelector('.master-param-unit').addEventListener('input', renderMasterLabUnitOptions);
+        renderMasterLabUnitOptions();
     }
 
     function addLabParameterRow(parameterId = '') {
@@ -1089,6 +1132,7 @@
     }
 
     async function loadMedicationSchedules() {
+        if (isGuest && !patientId) return;
         const medsList = document.getElementById('medsList');
         try {
             const response = await fetch(`/api/medications/schedule/patient/${patientId}`, {
@@ -1145,6 +1189,7 @@
     }
 
     async function loadMedicationLog() {
+        if (isGuest && !patientId) return;
         const medicationLog = document.getElementById('medicationLog');
         const selectedDate = document.getElementById('medicationLogDate').value;
         if (!selectedDate) {
@@ -1180,6 +1225,7 @@
     }
 
     async function loadDashboard() {
+        if (isGuest && !patientId) return;
         try {
             const startDate = document.getElementById('vitalsStartDate').value;
             const endDate = document.getElementById('vitalsEndDate').value;
@@ -1262,7 +1308,10 @@
             
             // Load unique recorded parameters for the lab trend chart.
             try {
-                const paramRes = await fetch('/api/labs/parameters/unique');
+                const paramsUrl = isGuest
+                    ? `/api/labs/parameters/unique?patient_id=${encodeURIComponent(patientId)}`
+                    : '/api/labs/parameters/unique';
+                const paramRes = await fetch(paramsUrl);
                 const paramData = await paramRes.json();
                 if (paramData.parameters && paramData.parameters.length > 0) {
                     const selectList = document.getElementById('labChartParamSelect');
@@ -1350,6 +1399,7 @@
     });
 
     async function loadPractitioners() {
+        if (isGuest && !patientId) return;
         try {
             const res = await fetch(`/api/medications/practitioners/patient/${patientId}`);
             const data = await res.json();
@@ -1601,6 +1651,7 @@
     });
 
     async function loadPrescriptions() {
+        if (isGuest && !patientId) return;
         try {
             const res = await fetch(`/api/medications/prescriptions/patient/${patientId}`);
             const data = await res.json();
@@ -1619,9 +1670,9 @@
                         <span style="font-size:0.85rem; color:var(--text-muted);">${p.items.length} medications</span>
                         <div style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.75rem;">
                             <button type="button" class="btn btn-outline" onclick="openPrescriptionView(${p.id})">View</button>
-                            ${p.status !== 'closed' ? `<button type="button" class="btn btn-outline" onclick="openEditPrescription(${p.id})">Edit</button>` : ''}
-                            ${p.status !== 'closed' ? `<button type="button" class="btn btn-outline" style="color:var(--danger-color);" onclick="forceClosePrescription(${p.id})">Force close</button>` : ''}
-                            <button type="button" class="btn btn-outline" onclick="openPrescriptionDelete(${p.id})">Delete</button>
+                            ${!isGuest && p.status !== 'closed' ? `<button type="button" class="btn btn-outline" onclick="openEditPrescription(${p.id})">Edit</button>` : ''}
+                            ${!isGuest && p.status !== 'closed' ? `<button type="button" class="btn btn-outline" style="color:var(--danger-color);" onclick="forceClosePrescription(${p.id})">Force close</button>` : ''}
+                            ${!isGuest ? `<button type="button" class="btn btn-outline" onclick="openPrescriptionDelete(${p.id})">Delete</button>` : ''}
                         </div>
                     </div>
                 `).join('');
@@ -1872,6 +1923,79 @@
     document.getElementById('medicationLogDate').addEventListener('change', loadMedicationLog);
     document.getElementById('vitalsStartDate').addEventListener('change', loadDashboard);
     document.getElementById('vitalsEndDate').addEventListener('change', loadDashboard);
+    if (isGuest) {
+        document.getElementById('guestPatientSelect').addEventListener('change', async event => {
+            patientId = event.target.value;
+            if (patientId) {
+                const selected = event.target.selectedOptions[0];
+                document.querySelector('.dashboard-header h2').textContent =
+                    `Guest View: ${selected.textContent}`;
+                event.target.disabled = true;
+                try {
+                    await Promise.all([
+                    loadSymptoms(),
+                    loadInterventions(),
+                    loadMedicationSchedules(),
+                    loadMedicationLog(),
+                    loadDashboard(),
+                    loadPractitioners(),
+                    loadPrescriptions()
+                    ]);
+                } finally {
+                    event.target.disabled = false;
+                }
+            } else {
+                document.querySelector('.dashboard-header h2').textContent = 'Guest Read-only View';
+                document.getElementById('symptomsList').innerHTML =
+                    '<p class="text-muted">Select a patient to view symptoms.</p>';
+                document.getElementById('interventionsList').innerHTML =
+                    '<p class="text-muted">Select a patient to view interventions.</p>';
+                document.getElementById('medsList').innerHTML =
+                    '<p class="text-muted">Select a patient to view medications.</p>';
+                document.getElementById('medicationLog').innerHTML =
+                    '<p class="text-muted">Select a patient to view medication history.</p>';
+                document.getElementById('prescriptionsList').innerHTML =
+                    '<p class="text-muted">Select a patient to view prescriptions.</p>';
+                document.getElementById('practitionersList').innerHTML =
+                    '<p class="text-muted">Select a patient to view practitioners.</p>';
+                document.getElementById('vitalsHistory').innerHTML =
+                    '<p class="text-muted">Select a patient to view vitals.</p>';
+                document.getElementById('labsHistory').innerHTML =
+                    '<p class="text-muted">Select a patient to view lab reports.</p>';
+                document.getElementById('lastBp').textContent = '--/--';
+                document.getElementById('lastHr').textContent = '--';
+                document.getElementById('lastSugar').textContent = '--';
+                document.getElementById('lastWeight').textContent = '--';
+                if (vitalsChartInstance) vitalsChartInstance.destroy();
+                if (labsChartInstance) labsChartInstance.destroy();
+                vitalsChartInstance = null;
+                labsChartInstance = null;
+                globalLabsData = [];
+            }
+        });
+    }
+
+    async function loadGuestPatients() {
+        const select = document.getElementById('guestPatientSelect');
+        try {
+            const response = await fetch('/api/auth/patients');
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Unable to load patients');
+
+            select.replaceChildren(new Option('Select a patient...', ''));
+            data.patients.forEach(patient => {
+                select.add(new Option(patient.name, patient.id));
+            });
+            if (!data.patients.length) {
+                select.replaceChildren(new Option('No patient records available', ''));
+                document.getElementById('medsList').innerHTML =
+                    '<p class="text-muted">No patient records are available to view.</p>';
+            }
+        } catch (error) {
+            console.error('Failed to load guest patient list:', error);
+            select.replaceChildren(new Option('Unable to load patients', ''));
+        }
+    }
 
     // Initialize
     setCurrentSymptomDateTime();
@@ -1880,12 +2004,32 @@
     setVitalsDateRangeToLastWeek();
     resetMasterLabTestForm();
     loadMasterLabTests();
-    loadSymptoms();
-    loadInterventions();
-    loadMedicationSchedules();
-    loadMedicationLog();
-    loadDashboard();
-    loadPractitioners();
-    loadPrescriptions();
+    if (isGuest) {
+        document.getElementById('symptomsList').innerHTML =
+            '<p class="text-muted">Select a patient to view symptoms.</p>';
+        document.getElementById('interventionsList').innerHTML =
+            '<p class="text-muted">Select a patient to view interventions.</p>';
+        document.getElementById('medsList').innerHTML =
+            '<p class="text-muted">Select a patient to view medications.</p>';
+        document.getElementById('medicationLog').innerHTML =
+            '<p class="text-muted">Select a patient to view medication history.</p>';
+        document.getElementById('prescriptionsList').innerHTML =
+            '<p class="text-muted">Select a patient to view prescriptions.</p>';
+        document.getElementById('practitionersList').innerHTML =
+            '<p class="text-muted">Select a patient to view practitioners.</p>';
+        document.getElementById('vitalsHistory').innerHTML =
+            '<p class="text-muted">Select a patient to view vitals.</p>';
+        document.getElementById('labsHistory').innerHTML =
+            '<p class="text-muted">Select a patient to view lab reports.</p>';
+        loadGuestPatients();
+    } else {
+        loadSymptoms();
+        loadInterventions();
+        loadMedicationSchedules();
+        loadMedicationLog();
+        loadDashboard();
+        loadPractitioners();
+        loadPrescriptions();
+    }
 </script>
 {% endblock %}
