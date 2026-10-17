@@ -316,6 +316,10 @@
 <div id="labReportDetailsModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
     <div class="card" style="max-width:600px; margin:5% auto; position:relative;">
         <h3 id="labReportDetailsTitle" class="card-title">Lab Test Details</h3>
+        <div id="labPastRecordsPicker" class="form-group" style="display:none;">
+            <label class="form-label" for="labPastRecordDate">Past record date</label>
+            <select id="labPastRecordDate" class="form-control"></select>
+        </div>
         <div id="labReportDetailsContent"></div>
         <div style="display:flex; justify-content:flex-end; margin-top:1rem;">
             <button type="button" class="btn btn-outline" onclick="closeLabReportDetails()">Close</button>
@@ -533,6 +537,7 @@
     let vitalsChartInstance = null;
     let labsChartInstance = null;
     let globalLabsData = [];
+    let labTrendParameters = [];
     let masterLabTests = [];
 
     function switchTab(tabId, btnElement) {
@@ -906,6 +911,7 @@
             if (!response.ok) throw new Error(data.error || 'Unable to load master lab tests');
             masterLabTests = data.tests || [];
             renderMasterLabUnitOptions();
+            if (globalLabsData.length > 0) populateLabTrendParameters();
 
             const testSelect = document.getElementById('labTestName');
             const selectedTestId = testSelect.value;
@@ -1076,9 +1082,7 @@
         resetLabForm();
     }
 
-    function showLabReport(reportId) {
-        const report = globalLabsData.find(item => item.id === reportId);
-        if (!report) return;
+    function renderLabReportDetails(report) {
         document.getElementById('labReportDetailsTitle').textContent = report.test_name;
         document.getElementById('labReportDetailsContent').innerHTML = `
             <p><strong>Recorded:</strong> ${escapeHtml(new Date(report.recorded_at).toLocaleString())}</p>
@@ -1091,11 +1095,43 @@
                 `).join('')}
             </div>
         `;
+    }
+
+    function showLabReport(reportId) {
+        const report = globalLabsData.find(item => item.id === reportId);
+        if (!report) return;
+        document.getElementById('labPastRecordsPicker').style.display = 'none';
+        renderLabReportDetails(report);
+        document.getElementById('labReportDetailsModal').style.display = 'block';
+    }
+
+    function showLabPastRecords(latestReportId) {
+        const latestReport = globalLabsData.find(report => report.id === latestReportId);
+        if (!latestReport) return;
+        const reports = globalLabsData
+            .filter(report => report.test_name.toLocaleLowerCase() === latestReport.test_name.toLocaleLowerCase())
+            .sort((left, right) =>
+                new Date(right.recorded_at) - new Date(left.recorded_at) || right.id - left.id
+            );
+        if (reports.length < 2) return;
+
+        const dateSelect = document.getElementById('labPastRecordDate');
+        dateSelect.innerHTML = reports.slice(1).map(report => `
+            <option value="${report.id}">${escapeHtml(new Date(report.recorded_at).toLocaleString())}</option>
+        `).join('');
+        dateSelect.onchange = () => {
+            const report = reports.find(item => String(item.id) === dateSelect.value);
+            if (report) renderLabReportDetails(report);
+        };
+        document.getElementById('labPastRecordsPicker').style.display = 'block';
+        renderLabReportDetails(reports[1]);
         document.getElementById('labReportDetailsModal').style.display = 'block';
     }
 
     function closeLabReportDetails() {
         document.getElementById('labReportDetailsModal').style.display = 'none';
+        document.getElementById('labPastRecordsPicker').style.display = 'none';
+        document.getElementById('labPastRecordDate').replaceChildren();
     }
 
     async function editLabReport(reportId) {
@@ -1377,48 +1413,44 @@
             globalLabsData = labsData.reports || [];
             
             if (globalLabsData.length > 0) {
-                const labsHtml = globalLabsData.map(r => `
+                const reportsByTest = new Map();
+                globalLabsData
+                    .slice()
+                    .sort((left, right) =>
+                        new Date(right.recorded_at) - new Date(left.recorded_at) || right.id - left.id
+                    )
+                    .forEach(report => {
+                        const testKey = report.test_name.toLocaleLowerCase();
+                        if (!reportsByTest.has(testKey)) reportsByTest.set(testKey, []);
+                        reportsByTest.get(testKey).push(report);
+                    });
+                const labsHtml = Array.from(reportsByTest.values()).map(reports => {
+                    const latestReport = reports[0];
+                    return `
                     <div style="padding: 1rem; border: 1px solid var(--border-color); border-radius: var(--border-radius-md); margin-bottom: 1rem;">
                         <div style="display:flex; justify-content:space-between; align-items:center; gap:0.75rem; flex-wrap:wrap; margin-bottom:0.5rem;">
-                            <h4 style="margin:0; color:var(--primary-color);">${escapeHtml(r.test_name)} <span style="color:var(--text-muted); font-size:0.85rem; font-weight:normal;">(${new Date(r.recorded_at).toLocaleDateString()})</span></h4>
+                            <h4 style="margin:0; color:var(--primary-color);">${escapeHtml(latestReport.test_name)} <span style="color:var(--text-muted); font-size:0.85rem; font-weight:normal;">(${new Date(latestReport.recorded_at).toLocaleDateString()})</span></h4>
                             <div style="display:flex; gap:0.5rem;">
-                                <button type="button" class="btn btn-outline" onclick="showLabReport(${r.id})">View</button>
-                                ${!isGuest ? `<button type="button" class="btn btn-outline" onclick="editLabReport(${r.id})">Edit</button>` : ''}
+                                <button type="button" class="btn btn-outline" onclick="showLabReport(${latestReport.id})">View</button>
+                                ${reports.length > 1 ? `<button type="button" class="btn btn-outline" onclick="showLabPastRecords(${latestReport.id})">Past records</button>` : ''}
+                                ${!isGuest ? `<button type="button" class="btn btn-outline" onclick="editLabReport(${latestReport.id})">Edit</button>` : ''}
                             </div>
                         </div>
                         <div style="display:flex; flex-wrap:wrap; gap:1rem;">
-                            ${r.parameters.map(p => `
+                            ${latestReport.parameters.map(p => `
                                 <div style="background:var(--background-color); padding:0.5rem 1rem; border-radius:var(--border-radius-sm);">
                                     <strong>${escapeHtml(p.name)}:</strong> ${escapeHtml(String(p.value))} ${escapeHtml(p.unit)}
                                 </div>
                             `).join('')}
                         </div>
                     </div>
-                `).join('');
+                `}).join('');
                 document.getElementById('labsHistory').innerHTML = labsHtml;
             } else {
                 document.getElementById('labsHistory').innerHTML = '<p class="text-muted">No lab reports found.</p>';
             }
             
-            // Load unique recorded parameters for the lab trend chart.
-            try {
-                const paramsUrl = isGuest
-                    ? `/api/labs/parameters/unique?patient_id=${encodeURIComponent(patientId)}`
-                    : '/api/labs/parameters/unique';
-                const paramRes = await fetch(paramsUrl);
-                const paramData = await paramRes.json();
-                if (paramData.parameters && paramData.parameters.length > 0) {
-                    const selectList = document.getElementById('labChartParamSelect');
-                    selectList.innerHTML = '<option value="">Select a parameter...</option>' +
-                        paramData.parameters.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
-                    
-                    // Auto-select first parameter and render
-                    selectList.value = paramData.parameters[0];
-                    renderLabsChart();
-                }
-            } catch(e) {
-                console.error("Failed to load autocomplete parameters", e);
-            }
+            populateLabTrendParameters();
             
         } catch(e) {
             console.error(e);
@@ -1964,27 +1996,29 @@
     }
 
     function renderLabsChart() {
-        const paramName = document.getElementById('labChartParamSelect').value;
+        const selectedValue = document.getElementById('labChartParamSelect').value;
+        const selectedParameter = selectedValue === '' ? null : labTrendParameters[Number(selectedValue)];
         const ctx = document.getElementById('labsChart').getContext('2d');
         
         if (labsChartInstance) {
             labsChartInstance.destroy();
+            labsChartInstance = null;
         }
         
-        if (!paramName || !globalLabsData || globalLabsData.length === 0) return;
+        if (!selectedParameter || !globalLabsData || globalLabsData.length === 0) return;
 
-        // Extract and sort data points for the selected parameter
         const dataPoints = [];
-        let unit = '';
-        
         globalLabsData.forEach(report => {
-            const param = report.parameters.find(p => p.name === paramName);
+            if (report.test_name.toLocaleLowerCase() !== selectedParameter.testName.toLocaleLowerCase()) return;
+            const param = report.parameters.find(p =>
+                p.name.toLocaleLowerCase() === selectedParameter.parameterName.toLocaleLowerCase()
+            );
             if (param) {
                 dataPoints.push({
                     date: new Date(report.recorded_at),
-                    value: param.value
+                    value: param.value,
+                    unit: param.unit
                 });
-                if (param.unit) unit = param.unit;
             }
         });
         
@@ -1992,30 +2026,100 @@
         
         const labels = dataPoints.map(dp => dp.date.toLocaleDateString([], {month:'short', day:'numeric'}));
         const values = dataPoints.map(dp => dp.value);
+        const datasets = [{
+            label: `${selectedParameter.parameterName} ${dataPoints[0]?.unit ? `(${dataPoints[0].unit})` : ''}`,
+            data: values,
+            borderColor: '#9d4edd',
+            backgroundColor: 'rgba(157, 78, 221, 0.2)',
+            tension: 0.3,
+            fill: true,
+            pointRadius: 5,
+            pointHoverRadius: 7
+        }];
+        if (selectedParameter.lowRange !== null) {
+            datasets.push({
+                label: 'Reference Range LOW',
+                data: labels.map(() => selectedParameter.lowRange),
+                borderColor: '#e76f51',
+                backgroundColor: '#e76f51',
+                borderDash: [6, 4],
+                borderWidth: 2,
+                pointRadius: 0,
+                pointHoverRadius: 0,
+                fill: false,
+                tension: 0
+            });
+        }
+        if (selectedParameter.highRange !== null) {
+            datasets.push({
+                label: 'Reference Range HIGH',
+                data: labels.map(() => selectedParameter.highRange),
+                borderColor: '#2a9d8f',
+                backgroundColor: '#2a9d8f',
+                borderDash: [6, 4],
+                borderWidth: 2,
+                pointRadius: 0,
+                pointHoverRadius: 0,
+                fill: false,
+                tension: 0
+            });
+        }
 
         labsChartInstance = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: labels,
-                datasets: [{
-                    label: `${paramName} ${unit ? '('+unit+')' : ''}`,
-                    data: values,
-                    borderColor: '#9d4edd',
-                    backgroundColor: 'rgba(157, 78, 221, 0.2)',
-                    tension: 0.3,
-                    fill: true,
-                    pointRadius: 5,
-                    pointHoverRadius: 7
-                }]
+                datasets
             },
             options: {
                 responsive: true,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: true }
+                },
                 scales: {
                     x: { ticks: { maxRotation: 45, minRotation: 45 } },
                     y: { beginAtZero: false }
                 }
             }
         });
+    }
+
+    function populateLabTrendParameters() {
+        const select = document.getElementById('labChartParamSelect');
+        const previous = labTrendParameters[Number(select.value)];
+        const previousKey = previous
+            ? `${previous.testName.toLocaleLowerCase()}|${previous.parameterName.toLocaleLowerCase()}`
+            : null;
+        const parameters = new Map();
+
+        globalLabsData.forEach(report => report.parameters.forEach(parameter => {
+            const key = `${report.test_name.toLocaleLowerCase()}|${parameter.name.toLocaleLowerCase()}`;
+            if (parameters.has(key)) return;
+            const test = masterLabTests.find(item =>
+                item.name.toLocaleLowerCase() === report.test_name.toLocaleLowerCase()
+            );
+            const masterParameter = test?.parameters.find(item =>
+                item.name.toLocaleLowerCase() === parameter.name.toLocaleLowerCase()
+            );
+            parameters.set(key, {
+                key,
+                testName: report.test_name,
+                parameterName: parameter.name,
+                lowRange: masterParameter?.low_range ?? null,
+                highRange: masterParameter?.high_range ?? null
+            });
+        }));
+
+        labTrendParameters = Array.from(parameters.values());
+        select.innerHTML = '<option value="">Select a test parameter...</option>' +
+            labTrendParameters.map((parameter, index) =>
+                `<option value="${index}">${escapeHtml(parameter.testName)} — ${escapeHtml(parameter.parameterName)}</option>`
+            ).join('');
+
+        const selectedIndex = labTrendParameters.findIndex(parameter => parameter.key === previousKey);
+        select.value = String(selectedIndex >= 0 ? selectedIndex : (labTrendParameters.length ? 0 : ''));
+        renderLabsChart();
     }
 
     document.getElementById('medicationLogDate').addEventListener('change', loadMedicationLog);
@@ -2069,6 +2173,7 @@
                 vitalsChartInstance = null;
                 labsChartInstance = null;
                 globalLabsData = [];
+                populateLabTrendParameters();
             }
         });
     }
