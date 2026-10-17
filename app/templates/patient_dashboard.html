@@ -992,7 +992,7 @@
     function addLabParameterRow(parameterId = '', value = '') {
         const row = document.createElement('div');
         row.className = 'lab-param-row';
-        row.style.cssText = 'display:grid; grid-template-columns:minmax(10rem, 2fr) minmax(6rem, 1fr) minmax(5rem, 0.8fr); gap:0.5rem; align-items:start;';
+        row.style.cssText = 'display:grid; grid-template-columns:minmax(10rem, 2fr) minmax(6rem, 1fr) minmax(8rem, 1fr); gap:0.5rem; align-items:start;';
         row.innerHTML = `
             <div>
                 <select class="form-control param-master-id" required>
@@ -1002,7 +1002,7 @@
             </div>
             <input type="number" step="any" class="form-control param-value" placeholder="Value" required>
             <div style="display:flex; gap:0.35rem; align-items:flex-start;">
-                <input type="text" class="form-control param-unit" placeholder="Unit" readonly aria-label="Unit of measure">
+                <input type="text" class="form-control param-unit" placeholder="Unit not set" readonly tabindex="-1" aria-label="Unit of measure">
                 <button type="button" class="btn btn-outline" aria-label="Remove parameter" onclick="this.closest('.lab-param-row').remove()">×</button>
             </div>
         `;
@@ -1015,7 +1015,19 @@
         }
         select.value = String(parameterId || '');
         select.addEventListener('change', () => updateLabParameterDetails(row));
-        row.querySelector('.param-value').value = value;
+        const valueInput = row.querySelector('.param-value');
+        valueInput.value = value;
+        valueInput.addEventListener('keydown', event => {
+            if (event.key !== 'Tab') return;
+            const rows = Array.from(document.querySelectorAll('.lab-param-row'));
+            const rowIndex = rows.indexOf(row);
+            const nextRow = rows[rowIndex + (event.shiftKey ? -1 : 1)];
+            const nextValueInput = nextRow?.querySelector('.param-value');
+            if (nextValueInput) {
+                event.preventDefault();
+                nextValueInput.focus();
+            }
+        });
         document.getElementById('labParamsContainer').appendChild(row);
         updateLabParameterDetails(row);
     }
@@ -1035,6 +1047,7 @@
     }
 
     function renderLabParameterRows(existingParameters = []) {
+        if (!Array.isArray(existingParameters)) existingParameters = [];
         const container = document.getElementById('labParamsContainer');
         container.replaceChildren();
         const test = masterLabTests.find(item => String(item.id) === document.getElementById('labTestName').value);
