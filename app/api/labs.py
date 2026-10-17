@@ -225,6 +225,7 @@ def create_report():
 
     master_parameters = {parameter.id: parameter for parameter in test.parameters}
     report_parameters = []
+    submitted_parameter_ids = set()
     for parameter in parameters:
         if not isinstance(parameter, dict):
             return jsonify({"error": "Invalid lab parameter data."}), 400
@@ -234,9 +235,11 @@ def create_report():
             isinstance(parameter_id, bool)
             or not isinstance(parameter_id, int)
             or parameter_id not in master_parameters
+            or parameter_id in submitted_parameter_ids
             or isinstance(value, bool)
         ):
             return jsonify({"error": "Select a valid parameter and enter its value."}), 400
+        submitted_parameter_ids.add(parameter_id)
         try:
             numeric_value = float(value)
         except (TypeError, ValueError):

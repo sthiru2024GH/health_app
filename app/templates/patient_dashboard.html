@@ -304,7 +304,6 @@
             <div id="labParamsContainer" style="display:grid; gap:0.75rem;">
                 <p class="text-muted">Select a test to choose its parameters.</p>
             </div>
-            <button type="button" class="btn btn-outline" style="padding:0.25rem 0.5rem; font-size:0.875rem;" onclick="addLabParameterRow()">+ Add Parameter</button>
             
             <div style="display:flex; justify-content:flex-end; gap:1rem; margin-top:2rem;">
                 <button type="button" class="btn btn-outline" onclick="closeLabModal()">Cancel</button>
@@ -995,26 +994,20 @@
         row.style.cssText = 'display:grid; grid-template-columns:minmax(10rem, 2fr) minmax(6rem, 1fr) minmax(8rem, 1fr); gap:0.5rem; align-items:start;';
         row.innerHTML = `
             <div>
-                <select class="form-control param-master-id" required>
-                    <option value="">Select a parameter...</option>
-                </select>
+                <input type="hidden" class="param-master-id">
+                <div class="form-control param-name" aria-label="Parameter name"></div>
                 <small class="lab-param-range text-muted"></small>
             </div>
-            <input type="number" step="any" class="form-control param-value" placeholder="Value" required>
+            <input type="number" step="any" class="form-control param-value" placeholder="Value">
             <div style="display:flex; gap:0.35rem; align-items:flex-start;">
                 <input type="text" class="form-control param-unit" placeholder="Unit not set" readonly tabindex="-1" aria-label="Unit of measure">
-                <button type="button" class="btn btn-outline" aria-label="Remove parameter" onclick="this.closest('.lab-param-row').remove()">×</button>
             </div>
         `;
-        const select = row.querySelector('.param-master-id');
         const test = masterLabTests.find(item => String(item.id) === document.getElementById('labTestName').value);
-        if (test) {
-            select.innerHTML += test.parameters.map(parameter =>
-                `<option value="${parameter.id}" data-unit="${escapeHtml(parameter.unit)}" data-low="${parameter.low_range ?? ''}" data-high="${parameter.high_range ?? ''}">${escapeHtml(parameter.name)}</option>`
-            ).join('');
-        }
-        select.value = String(parameterId || '');
-        select.addEventListener('change', () => updateLabParameterDetails(row));
+        const parameter = test?.parameters.find(item => String(item.id) === String(parameterId));
+        if (!parameter) return;
+        row.querySelector('.param-master-id').value = String(parameter.id);
+        row.querySelector('.param-name').textContent = parameter.name;
         const valueInput = row.querySelector('.param-value');
         valueInput.value = value;
         valueInput.addEventListener('keydown', event => {
@@ -1029,21 +1022,13 @@
             }
         });
         document.getElementById('labParamsContainer').appendChild(row);
-        updateLabParameterDetails(row);
-    }
-
-    function updateLabParameterDetails(row) {
-        const select = row.querySelector('.param-master-id');
-        const option = select.selectedOptions[0];
-        row.querySelector('.param-unit').value = option?.dataset.unit || '';
-        if (!option || !option.value) {
-            row.querySelector('.lab-param-range').textContent = '';
-            return;
-        }
-        const low = option.dataset.low;
-        const high = option.dataset.high;
+        row.querySelector('.param-unit').value = parameter.unit || '';
+        const low = parameter.low_range;
+        const high = parameter.high_range;
         row.querySelector('.lab-param-range').textContent =
-        low === '' && high === '' ? 'Accepted range not specified' : `Accepted range: ${low === '' ? '—' : low} to ${high === '' ? '—' : high}`;
+            low === null && high === null
+                ? 'Accepted range not specified'
+                : `Accepted range: ${low === null ? '—' : low} to ${high === null ? '—' : high}`;
     }
 
     function renderLabParameterRows(existingParameters = []) {
