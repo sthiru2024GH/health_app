@@ -225,7 +225,12 @@
 <div id="advancedAnalyticsTab" class="tab-content">
     <div class="card">
         <h3 class="card-title">Advanced Analytics</h3>
-        <p class="text-muted">Coming soon</p>
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;">
+            <button type="button" class="btn btn-primary" id="abnormalResultsMenuBtn">Abnormal Results</button>
+        </div>
+        <div id="abnormalResultsPanel">
+            <p class="text-muted">Loading lab results...</p>
+        </div>
     </div>
 </div>
 
@@ -2164,7 +2169,96 @@
         const selectedIndex = labTrendParameters.findIndex(parameter => parameter.key === previousKey);
         select.value = String(selectedIndex >= 0 ? selectedIndex : (labTrendParameters.length ? 0 : ''));
         renderLabsChart();
+        renderAbnormalResults();
     }
+
+    function findParameterRange(testName, parameterName) {
+        const test = masterLabTests.find(item =>
+            item.name.toLocaleLowerCase() === testName.toLocaleLowerCase()
+        );
+        const parameter = test?.parameters.find(item =>
+            item.name.toLocaleLowerCase() === parameterName.toLocaleLowerCase()
+        );
+        return { low: parameter?.low_range ?? null, high: parameter?.high_range ?? null };
+    }
+
+    // Lists every report (not just the latest per test) with at least one out-of-range parameter.
+    function renderAbnormalResults() {
+        const panel = document.getElementById('abnormalResultsPanel');
+        if (!panel) return;
+
+        const abnormalReports = [];
+        globalLabsData.forEach(report => {
+            const abnormalParameters = [];
+            report.parameters.forEach(parameter => {
+                const value = Number(parameter.value);
+                if (parameter.value === null || parameter.value === '' || Number.isNaN(value)) return;
+                const { low, high } = findParameterRange(report.test_name, parameter.name);
+                const status = low !== null && value < low ? 'Low'
+                    : (high !== null && value > high ? 'High' : null);
+                if (status) abnormalParameters.push({ parameter, status, low, high });
+            });
+            if (abnormalParameters.length) abnormalReports.push({ report, abnormalParameters });
+        });
+
+        if (!abnormalReports.length) {
+            panel.innerHTML = globalLabsData.length
+                ? '<p class="text-muted">No abnormal lab results found.</p>'
+                : '<p class="text-muted">No lab reports found.</p>';
+            return;
+        }
+
+        abnormalReports.sort((a, b) =>
+            new Date(b.report.recorded_at) - new Date(a.report.recorded_at) || b.report.id - a.report.id
+        );
+
+        panel.innerHTML = abnormalReports.map(({ report, abnormalParameters }) => `
+            <div style="padding:1rem; border:1px solid var(--border-color); border-radius:var(--border-radius-md); margin-bottom:1rem;">
+                <h4 style="margin:0 0 0.5rem 0; color:var(--primary-color);">
+                    ${escapeHtml(report.test_name)}
+                    <span style="color:var(--text-muted); font-size:0.85rem; font-weight:normal;">
+                        (${escapeHtml(new Date(report.recorded_at).toLocaleString())})
+                    </span>
+                </h4>
+                <div style="display:flex; flex-wrap:wrap; gap:0.75rem;">
+                    ${abnormalParameters.map(({ parameter, status, low, high }) => `
+                        <button type="button" class="btn btn-outline abnormal-param-btn"
+                                style="border-color:var(--danger-color); text-align:left;"
+                                data-test-name="${escapeHtml(report.test_name)}"
+                                data-parameter-name="${escapeHtml(parameter.name)}"
+                                title="View trend chart">
+                            <strong>${escapeHtml(parameter.name)}:</strong>
+                            ${escapeHtml(String(parameter.value))} ${escapeHtml(parameter.unit)}
+                            <span style="color:var(--danger-color); font-weight:600;">${status}</span>
+                            <span style="color:var(--text-muted); font-size:0.8rem;">
+                                (range ${low === null ? '—' : low} to ${high === null ? '—' : high})
+                            </span>
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function showLabTrendForParameter(testName, parameterName) {
+        const key = `${testName.toLocaleLowerCase()}|${parameterName.toLocaleLowerCase()}`;
+        const index = labTrendParameters.findIndex(parameter => parameter.key === key);
+        if (index < 0) return;
+
+        const analyticsButton = Array.from(document.querySelectorAll('.tab-btn')).find(button =>
+            (button.getAttribute('onclick') || '').includes("'analyticsTab'")
+        );
+        if (analyticsButton) switchTab('analyticsTab', analyticsButton);
+
+        document.getElementById('labChartParamSelect').value = String(index);
+        renderLabsChart();
+        document.getElementById('labsChart').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    document.getElementById('abnormalResultsPanel').addEventListener('click', event => {
+        const button = event.target.closest('.abnormal-param-btn');
+        if (button) showLabTrendForParameter(button.dataset.testName, button.dataset.parameterName);
+    });
 
     document.getElementById('medicationLogDate').addEventListener('change', loadMedicationLog);
     document.getElementById('vitalsStartDate').addEventListener('change', loadDashboard);
