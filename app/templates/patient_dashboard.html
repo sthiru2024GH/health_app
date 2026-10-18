@@ -1947,38 +1947,69 @@
         const systolicData = sortedVitals.map(v => v.systolic);
         const diastolicData = sortedVitals.map(v => v.diastolic);
         const hrData = sortedVitals.map(v => v.heart_rate);
+        const weightData = sortedVitals.map(v => v.weight_kg);
+
+        // Build datasets array - only include datasets that have at least one non-null value
+        const datasets = [];
+
+        // Blood Pressure (Systolic & Diastolic) - always included if any BP data exists
+        if (systolicData.some(v => v !== null)) {
+            datasets.push({
+                label: 'Systolic BP',
+                data: systolicData,
+                borderColor: '#f72585',
+                backgroundColor: '#f72585',
+                tension: 0.3,
+                spanGaps: true,
+                yAxisID: 'y'
+            });
+        }
+
+        if (diastolicData.some(v => v !== null)) {
+            datasets.push({
+                label: 'Diastolic BP',
+                data: diastolicData,
+                borderColor: '#4361ee',
+                backgroundColor: '#4361ee',
+                tension: 0.3,
+                spanGaps: true,
+                yAxisID: 'y'
+            });
+        }
+
+        // Heart Rate
+        if (hrData.some(v => v !== null)) {
+            datasets.push({
+                label: 'Heart Rate',
+                data: hrData,
+                borderColor: '#4cc9f0',
+                backgroundColor: '#4cc9f0',
+                tension: 0.3,
+                spanGaps: true,
+                yAxisID: 'y'
+            });
+        }
+
+        // Weight - uses secondary Y axis for different scale
+        if (weightData.some(v => v !== null)) {
+            datasets.push({
+                label: 'Weight (kg)',
+                data: weightData,
+                borderColor: '#ffd60a',
+                backgroundColor: '#ffd60a',
+                tension: 0.3,
+                spanGaps: true,
+                yAxisID: 'y1',  // Secondary axis for weight
+                borderDash: [5, 5]  // Dashed line to distinguish from other vitals
+            });
+        }
 
         const ctx = document.getElementById('vitalsChart').getContext('2d');
         vitalsChartInstance = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: labels,
-                datasets: [
-                    {
-                        label: 'Systolic BP',
-                        data: systolicData,
-                        borderColor: '#f72585',
-                        backgroundColor: '#f72585',
-                        tension: 0.3,
-                        spanGaps: true
-                    },
-                    {
-                        label: 'Diastolic BP',
-                        data: diastolicData,
-                        borderColor: '#4361ee',
-                        backgroundColor: '#4361ee',
-                        tension: 0.3,
-                        spanGaps: true
-                    },
-                    {
-                        label: 'Heart Rate',
-                        data: hrData,
-                        borderColor: '#4cc9f0',
-                        backgroundColor: '#4cc9f0',
-                        tension: 0.3,
-                        spanGaps: true
-                    }
-                ]
+                datasets: datasets
             },
             options: {
                 responsive: true,
@@ -1988,8 +2019,21 @@
                         ticks: { maxRotation: 45, minRotation: 45 }
                     },
                     y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: { display: true, text: 'BP (mmHg) / Heart Rate (bpm)' },
                         beginAtZero: false
-                    }
+                    },
+                    // Secondary Y-axis for Weight (only if weight data exists)
+                    y1: weightData.some(v => v !== null) ? {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: { display: true, text: 'Weight (kg)' },
+                        beginAtZero: false,
+                        grid: { drawOnChartArea: false }  // Don't draw grid lines for secondary axis
+                    } : undefined
                 }
             }
         });
