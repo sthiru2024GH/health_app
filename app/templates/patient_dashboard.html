@@ -382,10 +382,10 @@
             </div>
             <div class="form-group">
                 <label class="form-label">Notes</label>
-                <input type="text" id="prescNotes" class="form-control" placeholder="Optional notes...">
+                <input type="text" id="prescNotes" class="form-control" placeholder="Optional notes (e.g., advice or instructions)...">
             </div>
 
-            <h4 style="margin: 1.5rem 0 0.5rem 0;">Medications</h4>
+            <h4 style="margin: 1.5rem 0 0.5rem 0;">Medications <span style="font-size:0.85rem; color:var(--text-muted);">(Optional)</span></h4>
             <div id="prescItemsContainer">
                 <div class="grid-4 presc-item-row" style="margin-bottom: 0.5rem; gap:0.5rem; align-items:center;">
                     <input type="text" class="form-control item-drug" placeholder="Drug Name" required>
@@ -1743,9 +1743,12 @@
             if (drug && qty && unit && time) items.push(item);
         });
 
+        const notes = document.getElementById('prescNotes').value.trim();
         const error = document.getElementById('prescriptionFormError');
-        if (items.length === 0) {
-            error.textContent = 'Add at least one complete medication.';
+        
+        // Allow prescription with either medications or notes, but not neither
+        if (items.length === 0 && !notes) {
+            error.textContent = 'Prescription must include at least one medication or notes.';
             error.style.display = 'block';
             return;
         }
@@ -1754,7 +1757,7 @@
             patient_id: Number(patientId),
             practitioner_id: document.getElementById('prescPractitioner').value,
             date_issued: document.getElementById('prescDate').value,
-            notes: document.getElementById('prescNotes').value,
+            notes: notes,
             items: items
         };
         const prescriptionId = document.getElementById('prescId').value;
@@ -1798,7 +1801,10 @@
                             Practitioner: ${escapePrescriptionHtml(p.practitioner_name || 'Not specified')} ·
                             ${p.status === 'closed' ? 'Force-closed — not scheduled' : p.status === 'superseded' ? 'Superseded — not scheduled' : 'Latest for practitioner — scheduled'}
                         </span><br>
-                        <span style="font-size:0.85rem; color:var(--text-muted);">${p.items.length} medications</span>
+                        <span style="font-size:0.85rem; color:var(--text-muted);">
+                            ${p.items.length > 0 ? `${p.items.length} medication${p.items.length === 1 ? '' : 's'}` : 'Notes only'}
+                            ${p.notes ? ` · Has notes` : ''}
+                        </span>
                         <div style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.75rem;">
                             <button type="button" class="btn btn-outline" onclick="openPrescriptionView(${p.id})">View</button>
                             ${!isGuest && p.status !== 'closed' ? `<button type="button" class="btn btn-outline" onclick="openEditPrescription(${p.id})">Edit</button>` : ''}

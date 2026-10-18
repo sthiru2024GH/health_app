@@ -84,8 +84,14 @@ def get_practitioners(patient_id):
 @login_required
 def create_prescription():
     data = request.json
-    if not data or not data.get('patient_id') or not data.get('items'):
+    if not data or not data.get('patient_id'):
         return jsonify({"error": "Missing required fields"}), 400
+
+    # Allow prescription with either items (medications) or notes (advice), but not neither
+    items = data.get('items', [])
+    notes = data.get('notes', '').strip()
+    if not items and not notes:
+        return jsonify({"error": "Prescription must include at least one medication or notes"}), 400
 
     current_user_id = session.get('user_id')
     current_user_role = session.get('role')
@@ -95,7 +101,7 @@ def create_prescription():
     prescription = Prescription(
         patient_id=data['patient_id'],
         practitioner_id=data.get('practitioner_id'),
-        notes=data.get('notes', '')
+        notes=notes
     )
     if data.get('date_issued'):
         prescription.date_issued = datetime.strptime(data['date_issued'], '%Y-%m-%d').date()
@@ -103,7 +109,7 @@ def create_prescription():
     db.session.add(prescription)
     db.session.flush()
 
-    for item in data['items']:
+    for item in items:
         scheduled_time = datetime.strptime(item['time_of_day'], '%H:%M').time()
         p_item = PrescriptionItem(
             prescription_id=prescription.id,
@@ -176,23 +182,23 @@ def update_prescription(prescription_id):
         return jsonify({"error": "A force-closed prescription cannot be edited."}), 409
 
     data = request.get_json(silent=True)
-    if (
-        not isinstance(data, dict)
-        or not data.get('date_issued')
-        or not isinstance(data.get('items'), list)
-        or not data['items']
-    ):
-        return jsonify({"error": "Date issued and at least one medication are required"}), 400
+    if not isinstance(data, dict) or not data.get('date_issued'):
+        return jsonify({"error": "Date issued is required"}), 400
+
+    # Allow prescription with either items (medications) or notes (advice), but not neither
+    items = data.get('items', []) if isinstance(data.get('items'), list) else []
+    notes = (data.get('notes', '') or '').strip()
+    if not items and not notes:
+        return jsonify({"error": "Prescription must include at least one medication or notes"}), 400
 
     try:
         date_issued = datetime.strptime(data['date_issued'], '%Y-%m-%d').date()
-        notes = data.get('notes', '')
         if not isinstance(notes, str):
             return jsonify({"error": "Prescription notes must be text"}), 400
 
         submitted_items = []
         submitted_ids = set()
-        for item in data['items']:
+        for item in items:
             if not isinstance(item, dict):
                 return jsonify({"error": "Each medication must include a name, quantity, unit, and time"}), 400
 
