@@ -220,7 +220,10 @@ def login():
 
     # A valid, single-use CAPTCHA is required before checking credentials.
     if not verify_login_captcha(data.get('captcha_answer')):
-        return jsonify({"error": "Please solve the CAPTCHA to continue."}), 400
+        return jsonify({
+            "error": "Please solve the CAPTCHA to continue.",
+            "captcha_question": create_login_captcha(),
+        }), 400
 
     user = User.query.filter_by(username=data['username']).first()
     if user and user.check_password(data['password']):
@@ -228,13 +231,23 @@ def login():
         session['user_id'] = user.id
         session['role'] = user.role
         session['name'] = user.name
-        return jsonify({"message": "Login successful"}), 200
+        return jsonify({
+            "message": "Login successful",
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "name": user.name,
+                "role": user.role
+            }
+        }), 200
 
-    return jsonify({"error": "Invalid username or password"}), 401
+    return jsonify({
+        "error": "Invalid username or password",
+        "captcha_question": create_login_captcha(),
+    }), 401
 ```
 
-The actual success response also includes basic user details. Passwords are
-stored as Werkzeug password hashes by the `User` model.
+Passwords are stored as Werkzeug password hashes by the `User` model.
 
 ### ORM model — `app/models.py`
 
@@ -275,26 +288,42 @@ def create_symptom():
     if not isinstance(data, dict):
         return jsonify({'error': 'A valid symptom entry is required'}), 400
 
-    # Validate required fields and restrict severity to the supported values.
-    if not data.get('recorded_at') or not data.get('severity'):
-        return jsonify({'error': 'Date and severity are required'}), 400
-    if data['severity'] not in SEVERITIES:
-        return jsonify({'error': 'Invalid severity'}), 400
+    recorded_at_value = data.get('recorded_at')
+    severity = data.get('severity')
+    description = data.get('description')
+    if (
+        not recorded_at_value
+        or not severity
+        or not isinstance(description, str)
+        or not description.strip()
+    ):
+        return jsonify({
+            'error': 'Date and time, severity, and symptom details are required'
+        }), 400
 
-    recorded_at = datetime.fromisoformat(data['recorded_at'])
+    # Accept only the severity levels supported by the application.
+    if not isinstance(severity, str) or severity not in SEVERITIES:
+        return jsonify({
+            'error': 'Severity must be mild, moderate, major, or critical'
+        }), 400
+
+    try:
+        recorded_at = datetime.fromisoformat(recorded_at_value)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Enter a valid date and time'}), 400
+
     if recorded_at.tzinfo is None:
         recorded_at = recorded_at.replace(tzinfo=timezone.utc)  # Normalize naive input.
+    else:
+        recorded_at = recorded_at.astimezone(timezone.utc)
 
     entry = SymptomEntry(
         patient_id=session['user_id'],  # Derive ownership from the signed-in session.
         recorded_at=recorded_at,
-        severity=data['severity'],
-        description=data['description'].strip(),
+        severity=severity,
+        description=description.strip(),
     )
     db.session.add(entry)
     db.session.commit()
     return jsonify({'message': 'Symptom recorded', 'id': entry.id}), 201
 ```
-
-This shortened excerpt omits some required-field and timestamp error handling
-present in the complete route.
