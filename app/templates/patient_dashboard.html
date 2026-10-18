@@ -382,7 +382,7 @@
             </div>
             <div class="form-group">
                 <label class="form-label">Notes</label>
-                <input type="text" id="prescNotes" class="form-control" placeholder="Optional notes (e.g., advice or instructions)...">
+                <textarea id="prescNotes" class="form-control" placeholder="Optional notes (e.g., advice or instructions)..." style="min-height: 4rem; resize: vertical; font-family: inherit; line-height: 1.5;"></textarea>
             </div>
 
             <h4 style="margin: 1.5rem 0 0.5rem 0;">Medications <span style="font-size:0.85rem; color:var(--text-muted);">(Optional)</span></h4>
@@ -1602,6 +1602,9 @@
         document.getElementById('prescPractitioner').value = prescription.practitioner_id || '';
         document.getElementById('prescItemsContainer').innerHTML = '';
         prescription.items.forEach(item => addPrescItemRow(item));
+        // Auto-resize textarea to fit content
+        const notesTextarea = document.getElementById('prescNotes');
+        autoResizeTextarea(notesTextarea);
         document.getElementById('prescriptionModal').style.display = 'block';
     }
 
@@ -1665,7 +1668,7 @@
                 <dt><strong>Status</strong></dt>
                 <dd>${escapePrescriptionHtml(prescription.status || 'current')}</dd>
                 <dt><strong>Notes</strong></dt>
-                <dd>${escapePrescriptionHtml(prescription.notes || 'No notes')}</dd>
+                <dd style="white-space: pre-wrap; word-wrap: break-word; font-family: inherit;">${escapePrescriptionHtml(prescription.notes || 'No notes')}</dd>
             </dl>
             <h4 style="margin:1.5rem 0 0.5rem;">Medications</h4>
             <div style="overflow-x:auto;">
@@ -1726,6 +1729,18 @@
             error.style.display = 'block';
         }
     });
+
+    function autoResizeTextarea(textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = (textarea.scrollHeight) + 'px';
+    }
+
+    const prescNotesTextarea = document.getElementById('prescNotes');
+    if (prescNotesTextarea) {
+        prescNotesTextarea.addEventListener('input', function() {
+            autoResizeTextarea(this);
+        });
+    }
 
     document.getElementById('prescriptionForm').addEventListener('submit', async (e) => {
         e.preventDefault();
