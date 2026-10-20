@@ -291,6 +291,15 @@ def migrate_legacy_schema(engine, logger):
                 connection.execute(text(
                     "ALTER TABLE interventions ADD COLUMN status VARCHAR(20) DEFAULT 'active'"
                 ))
+            if "intervention_date" not in columns:
+                column_type = (
+                    "TIMESTAMP WITH TIME ZONE"
+                    if engine.dialect.name == "postgresql"
+                    else "DATETIME"
+                )
+                connection.execute(text(
+                    f"ALTER TABLE interventions ADD COLUMN intervention_date {column_type}"
+                ))
         if "vital_signs" in tables:
             columns = {
                 column["name"] for column in inspector.get_columns("vital_signs")

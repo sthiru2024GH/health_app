@@ -8,7 +8,7 @@ from app.utils.decorators import login_required, require_role
 
 
 interventions_bp = Blueprint('interventions', __name__)
-METHODS = {'medication', 'surgery', 'procedure', 'others'}
+METHODS = {'medications', 'surgery', 'procedure', 'others'}
 MEDICATION_TYPES = {'one_time', 'periodic'}
 FREQUENCY_UNITS = {'days', 'weeks', 'months'}
 
@@ -29,6 +29,11 @@ def _serialize_intervention(intervention):
     created_at = intervention.created_at
     if created_at.tzinfo is None:
         created_at = created_at.replace(tzinfo=timezone.utc)
+    
+    intervention_date = intervention.intervention_date
+    if intervention_date and intervention_date.tzinfo is None:
+        intervention_date = intervention_date.replace(tzinfo=timezone.utc)
+    
     return {
         'id': intervention.id,
         'practitioner_id': intervention.practitioner_id,
@@ -45,6 +50,7 @@ def _serialize_intervention(intervention):
         'diagnosis': intervention.diagnosis,
         'notes': intervention.notes,
         'status': intervention.status,
+        'intervention_date': intervention_date.isoformat() if intervention_date else None,
         'created_at': created_at.isoformat(),
         'logs': [_serialize_log(log) for log in logs],
     }
@@ -111,16 +117,27 @@ def create_intervention():
     if not symptom or symptom.patient_id != patient_id:
         return jsonify({'error': 'Select one of your recorded symptoms'}), 400
 
+    intervention_date_value = data.get('intervention_date')
+    intervention_date = None
+    if intervention_date_value:
+        try:
+            intervention_date = datetime.fromisoformat(intervention_date_value.replace('T', ' '))
+            if intervention_date.tzinfo is None:
+                intervention_date = intervention_date.replace(tzinfo=timezone.utc)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'Enter a valid intervention date and time'}), 400
+
     plan = Intervention(
         patient_id=patient_id,
         practitioner_id=practitioner_id,
         symptom_id=symptom_id,
         method=method,
         diagnosis=data.get('diagnosis') or None,
+        intervention_date=intervention_date,
         notes=notes,
     )
 
-    if method == 'medication':
+    if method == 'medications':
         medication_type = data.get('medication_type')
         drug_name = data.get('drug_name')
         if not isinstance(medication_type, str) or medication_type not in MEDICATION_TYPES:

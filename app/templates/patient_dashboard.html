@@ -427,17 +427,30 @@
                 </select>
             </div>
             <div class="form-group">
+                <label class="form-label" for="interventionDate">Date/Time of Intervention</label>
+                <input type="datetime-local" id="interventionDate" class="form-control" required>
+            </div>
+            <div class="form-group">
                 <label class="form-label" for="interventionMethodType">Method</label>
                 <select id="interventionMethodType" class="form-control" required onchange="updateInterventionFields()">
-                    <option value="medication">Medication</option>
+                    <option value="">Select intervention method...</option>
+                    <option value="medications">Medications</option>
                     <option value="surgery">Surgery</option>
                     <option value="procedure">Procedure</option>
                     <option value="others">Others</option>
                 </select>
             </div>
-            <div class="form-group">
-                <label class="form-label" for="interventionDiagnosis">Diagnosis (Optional)</label>
-                <input type="text" id="interventionDiagnosis" class="form-control" placeholder="e.g., Hypertension, Diabetes">
+            <div class="form-group" id="interventionDiagnosisContainer" style="display:none;">
+                <label class="form-label" for="interventionDiagnosis">Diagnosis</label>
+                <select id="interventionDiagnosis" class="form-control">
+                    <option value="">Select or type diagnosis...</option>
+                    <option value="Hypertension">Hypertension</option>
+                    <option value="Diabetes">Diabetes</option>
+                    <option value="Kidney Disease">Kidney Disease</option>
+                    <option value="Heart Disease">Heart Disease</option>
+                    <option value="Thyroid">Thyroid</option>
+                    <option value="Other">Other (specify in notes)</option>
+                </select>
             </div>
             <div id="interventionMedicationFields" style="display:none;">
                 <div class="form-group">
@@ -670,6 +683,7 @@
         form.reset();
         document.getElementById('interventionMethodType').value = method;
         document.getElementById('interventionFormError').style.display = 'none';
+        setCurrentInterventionDateTime();
         updateInterventionFields();
         document.getElementById('interventionModal').style.display = 'block';
     }
@@ -678,15 +692,27 @@
         document.getElementById('interventionModal').style.display = 'none';
         document.getElementById('interventionForm').reset();
         document.getElementById('interventionMethod').value = '';
+        // Set default date/time to now
+        setCurrentInterventionDateTime();
+    }
+
+    function setCurrentInterventionDateTime() {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('interventionDate').value = now.toISOString().slice(0, 16);
     }
 
     function updateInterventionFields() {
         const method = document.getElementById('interventionMethodType').value;
-        const isMedication = method === 'medication';
-        const isPeriodic = isMedication && document.getElementById('interventionMedicationType').value === 'periodic';
-        document.getElementById('interventionMedicationFields').style.display = isMedication ? 'block' : 'none';
+        const isMedications = method === 'medications';
+        const isPeriodic = isMedications && document.getElementById('interventionMedicationType').value === 'periodic';
+        
+        // Show/hide diagnosis dropdown based on method selection
+        document.getElementById('interventionDiagnosisContainer').style.display = method ? 'block' : 'none';
+        
+        document.getElementById('interventionMedicationFields').style.display = isMedications ? 'block' : 'none';
         document.getElementById('interventionFrequencyFields').style.display = isPeriodic ? 'block' : 'none';
-        document.getElementById('interventionDrugName').required = isMedication;
+        document.getElementById('interventionDrugName').required = isMedications;
         document.getElementById('interventionFrequencyCount').required = isPeriodic;
     }
 
@@ -701,14 +727,16 @@
         
         const method = document.getElementById('interventionMethodType').value;
         const medicationType = document.getElementById('interventionMedicationType').value;
+        const interventionDate = document.getElementById('interventionDate').value;
         const payload = {
             practitioner_id: document.getElementById('interventionPractitioner').value,
             symptom_id: document.getElementById('interventionSymptom').value,
             method,
+            intervention_date: interventionDate,
             notes: document.getElementById('interventionNotes').value,
             diagnosis: document.getElementById('interventionDiagnosis').value || null
         };
-        if (method === 'medication') {
+        if (method === 'medications') {
             payload.medication_type = medicationType;
             payload.drug_name = document.getElementById('interventionDrugName').value;
             if (medicationType === 'periodic') {
@@ -745,15 +773,15 @@
     }
 
     function interventionPlanDetails(plan) {
-        const medicationDetails = plan.method === 'medication'
+        const medicationDetails = plan.method === 'medications'
             ? `<p><strong>Drug:</strong> ${escapeHtml(plan.drug_name)}</p>
                <p><strong>Schedule:</strong> ${plan.medication_type === 'one_time'
                     ? 'One-time medication'
                     : `Every ${plan.frequency_count} ${escapeHtml(plan.frequency_unit)}${plan.end_date ? ` until ${escapeHtml(plan.end_date)}` : ''}`}</p>`
             : '';
-        const createdAt = plan.created_at ? new Date(plan.created_at).toLocaleString() : 'Not specified';
+        const interventionDateTime = plan.intervention_date ? new Date(plan.intervention_date).toLocaleString() : 'Not specified';
         return `
-            <p><strong>Created:</strong> ${createdAt}</p>
+            <p><strong>Intervention Date/Time:</strong> ${interventionDateTime}</p>
             <p><strong>Method:</strong> ${escapeHtml(interventionMethodLabel(plan.method))}</p>
             ${plan.diagnosis ? `<p><strong>Diagnosis:</strong> ${escapeHtml(plan.diagnosis)}</p>` : ''}
             ${medicationDetails}
@@ -855,10 +883,13 @@
         document.getElementById('interventionPractitioner').value = intervention.practitioner_id || '';
         document.getElementById('interventionSymptom').value = intervention.symptom_id || '';
         document.getElementById('interventionMethodType').value = intervention.method || '';
+        document.getElementById('interventionDate').value = intervention.intervention_date 
+            ? toDateTimeLocal(intervention.intervention_date) 
+            : '';
         document.getElementById('interventionDiagnosis').value = intervention.diagnosis || '';
         updateInterventionFields();
         
-        if (intervention.method === 'medication') {
+        if (intervention.method === 'medications') {
             document.getElementById('interventionMedicationType').value = intervention.medication_type || 'one_time';
             document.getElementById('interventionDrugName').value = intervention.drug_name || '';
             updateInterventionFields();
