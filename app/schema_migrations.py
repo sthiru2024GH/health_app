@@ -279,6 +279,18 @@ def migrate_legacy_schema(engine, logger):
                 connection.execute(text(
                     f"ALTER TABLE prescriptions ADD COLUMN closed_at {column_type}"
                 ))
+        if "interventions" in tables:
+            columns = {
+                column["name"] for column in inspector.get_columns("interventions")
+            }
+            if "diagnosis" not in columns:
+                connection.execute(text(
+                    "ALTER TABLE interventions ADD COLUMN diagnosis VARCHAR(200)"
+                ))
+            if "status" not in columns:
+                connection.execute(text(
+                    "ALTER TABLE interventions ADD COLUMN status VARCHAR(20) DEFAULT 'active'"
+                ))
         if "vital_signs" in tables:
             columns = {
                 column["name"] for column in inspector.get_columns("vital_signs")

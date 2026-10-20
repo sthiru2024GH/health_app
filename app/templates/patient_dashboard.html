@@ -435,6 +435,10 @@
                     <option value="others">Others</option>
                 </select>
             </div>
+            <div class="form-group">
+                <label class="form-label" for="interventionDiagnosis">Diagnosis (Optional)</label>
+                <input type="text" id="interventionDiagnosis" class="form-control" placeholder="e.g., Hypertension, Diabetes">
+            </div>
             <div id="interventionMedicationFields" style="display:none;">
                 <div class="form-group">
                     <label class="form-label" for="interventionMedicationType">Medication schedule</label>
@@ -688,13 +692,21 @@
 
     document.getElementById('interventionForm').addEventListener('submit', async event => {
         event.preventDefault();
+        const submitButton = event.target.querySelector('button[type="submit"]');
+        const cancelButton = event.target.querySelector('button[type="button"]');
+        
+        submitButton.disabled = true;
+        submitButton.textContent = 'Saving...';
+        cancelButton.disabled = true;
+        
         const method = document.getElementById('interventionMethodType').value;
         const medicationType = document.getElementById('interventionMedicationType').value;
         const payload = {
             practitioner_id: document.getElementById('interventionPractitioner').value,
             symptom_id: document.getElementById('interventionSymptom').value,
             method,
-            notes: document.getElementById('interventionNotes').value
+            notes: document.getElementById('interventionNotes').value,
+            diagnosis: document.getElementById('interventionDiagnosis').value || null
         };
         if (method === 'medication') {
             payload.medication_type = medicationType;
@@ -722,6 +734,9 @@
         } catch (err) {
             error.textContent = err.message || 'Unable to save intervention. Please try again.';
             error.style.display = 'block';
+            submitButton.disabled = false;
+            submitButton.textContent = 'Save Intervention';
+            cancelButton.disabled = false;
         }
     });
 
@@ -736,8 +751,11 @@
                     ? 'One-time medication'
                     : `Every ${plan.frequency_count} ${escapeHtml(plan.frequency_unit)}${plan.end_date ? ` until ${escapeHtml(plan.end_date)}` : ''}`}</p>`
             : '';
+        const createdAt = plan.created_at ? new Date(plan.created_at).toLocaleString() : 'Not specified';
         return `
+            <p><strong>Created:</strong> ${createdAt}</p>
             <p><strong>Method:</strong> ${escapeHtml(interventionMethodLabel(plan.method))}</p>
+            ${plan.diagnosis ? `<p><strong>Diagnosis:</strong> ${escapeHtml(plan.diagnosis)}</p>` : ''}
             ${medicationDetails}
             <p><strong>Practitioner:</strong> ${escapeHtml(plan.practitioner_name)}</p>
             <p><strong>Related symptom:</strong> ${escapeHtml(plan.symptom_description)} (${escapeHtml(plan.symptom_severity)})</p>
@@ -763,12 +781,22 @@
                 return;
             }
 
-            list.innerHTML = data.interventions.map(plan => `
+            // Sort interventions by created_at (newest first)
+            const sortedInterventions = [...data.interventions].sort((a, b) => {
+                const dateA = new Date(a.created_at || 0);
+                const dateB = new Date(b.created_at || 0);
+                return dateB - dateA;
+            });
+
+            list.innerHTML = sortedInterventions.map(plan => `
                 <article style="padding:1rem; border:1px solid var(--border-color); border-radius:var(--border-radius-md); margin-bottom:1rem;">
                     ${interventionPlanDetails(plan)}
-                    ${!isGuest ? `<div style="margin:0.75rem 0;">
-                        <button type="button" class="btn btn-primary" onclick="openInterventionLogForm(${plan.id})">Administered</button>
-                    </div>` : ''}
+                    <div style="display:flex; gap:0.5rem; margin:1rem 0; flex-wrap:wrap;">
+                        ${!isGuest ? `<button type="button" class="btn btn-primary" onclick="openInterventionLogForm(${plan.id})">Administered</button>` : ''}
+                        <button type="button" class="btn btn-outline" onclick="viewIntervention(${plan.id})">View</button>
+                        ${!isGuest ? `<button type="button" class="btn btn-outline" onclick="editIntervention(${plan.id})">Edit</button>` : ''}
+                        ${!isGuest ? `<button type="button" class="btn btn-outline" onclick="forceCloseIntervention(${plan.id})">Force Close</button>` : ''}
+                    </div>
                     <h4 style="margin:1rem 0 0.5rem;">Administration history</h4>
                     ${plan.logs.length ? plan.logs.map(log => `
                         <div style="padding:0.75rem 0; border-top:1px solid var(--border-color);">
@@ -812,6 +840,58 @@
         activeInterventionId = null;
         editingInterventionLogId = null;
         document.getElementById('interventionAdministeredModal').style.display = 'none';
+    }
+
+    function viewIntervention(id) {
+        const intervention = interventionsById.get(id);
+        if (!intervention) return;
+        alert(`Intervention Details:\n\n${interventionPlanDetails(intervention).replace(/<[^>]*>/g, '\n').trim()}`);
+    }
+
+    function editIntervention(id) {
+        const intervention = interventionsById.get(id);
+        if (!intervention) return;
+        
+        document.getElementById('interventionPractitioner').value = intervention.practitioner_id || '';
+        document.getElementById('interventionSymptom').value = intervention.symptom_id || '';
+        document.getElementById('interventionMethodType').value = intervention.method || '';
+        document.getElementById('interventionDiagnosis').value = intervention.diagnosis || '';
+        updateInterventionFields();
+        
+        if (intervention.method === 'medication') {
+            document.getElementById('interventionMedicationType').value = intervention.medication_type || 'one_time';
+            document.getElementById('interventionDrugName').value = intervention.drug_name || '';
+            updateInterventionFields();
+            
+            if (intervention.medication_type === 'periodic') {
+                document.getElementById('interventionFrequencyCount').value = intervention.frequency_count || '';
+                document.getElementById('interventionFrequencyUnit').value = intervention.frequency_unit || 'days';
+                document.getElementById('interventionEndDate').value = intervention.end_date || '';
+            }
+        }
+        
+        document.getElementById('interventionNotes').value = intervention.notes || '';
+        document.getElementById('interventionModal').style.display = 'block';
+    }
+
+    async function forceCloseIntervention(id) {
+        const intervention = interventionsById.get(id);
+        if (!intervention) return;
+        
+        if (!confirm(`Force close this intervention? It will no longer be active.`)) return;
+        
+        try {
+            const response = await fetch(`/api/interventions/${id}/close`, {
+                method: 'POST'
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Unable to close intervention');
+            
+            await loadInterventions();
+        } catch (error) {
+            console.error('Failed to close intervention:', error);
+            alert(error.message || 'Unable to close intervention.');
+        }
     }
 
     document.getElementById('interventionAdministeredForm').addEventListener('submit', async event => {

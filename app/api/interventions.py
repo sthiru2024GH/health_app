@@ -26,6 +26,9 @@ def _serialize_log(log):
 
 def _serialize_intervention(intervention):
     logs = intervention.logs.order_by(InterventionLog.administered_at.desc()).all()
+    created_at = intervention.created_at
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
     return {
         'id': intervention.id,
         'practitioner_id': intervention.practitioner_id,
@@ -39,7 +42,10 @@ def _serialize_intervention(intervention):
         'frequency_count': intervention.frequency_count,
         'frequency_unit': intervention.frequency_unit,
         'end_date': intervention.end_date.isoformat() if intervention.end_date else None,
+        'diagnosis': intervention.diagnosis,
         'notes': intervention.notes,
+        'status': intervention.status,
+        'created_at': created_at.isoformat(),
         'logs': [_serialize_log(log) for log in logs],
     }
 
@@ -110,6 +116,7 @@ def create_intervention():
         practitioner_id=practitioner_id,
         symptom_id=symptom_id,
         method=method,
+        diagnosis=data.get('diagnosis') or None,
         notes=notes,
     )
 
@@ -204,3 +211,16 @@ def update_intervention_log(log_id):
     log.notes = notes.strip()
     db.session.commit()
     return jsonify({'message': 'Intervention log updated'}), 200
+
+
+@interventions_bp.route('/<int:intervention_id>/close', methods=['POST'])
+@require_role('patient')
+def close_intervention(intervention_id):
+    plan = db.session.get(Intervention, intervention_id)
+    if not plan or plan.patient_id != session['user_id']:
+        return jsonify({'error': 'Intervention not found'}), 404
+
+    plan.status = 'closed'
+    db.session.commit()
+    return jsonify({'message': 'Intervention closed'}), 200
+
