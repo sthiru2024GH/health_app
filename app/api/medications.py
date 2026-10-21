@@ -267,7 +267,6 @@ def update_prescription(prescription_id):
             existing_item.drug_name != submitted_item["drug_name"]
             or existing_item.quantity != submitted_item["quantity"]
             or existing_item.unit != submitted_item["unit"]
-            or existing_item.time_of_day != submitted_item["time_of_day"]
             or existing_item.dependent_event != submitted_item["dependent_event"]
         ):
             return jsonify({"error": "Medication details with recorded history cannot be changed"}), 409

@@ -1770,13 +1770,13 @@
         const disabled = item && item.has_logs ? 'disabled' : '';
         const itemId = item ? `data-item-id="${item.id}"` : '';
         const lockNote = item && item.has_logs
-            ? '<small style="grid-column:span 4; color:var(--text-muted);">This medication has recorded history and cannot be changed or removed.</small>'
+            ? '<small style="grid-column:span 4; color:var(--text-muted);">This medication has recorded history: only the time can be changed. It cannot be removed.</small>'
             : '';
         row.innerHTML = `
             <input type="text" class="form-control item-drug" placeholder="Drug Name" ${disabled} value="${escapePrescriptionHtml(item?.drug_name)}" ${itemId}>
             <input type="number" min="0.1" step="0.1" class="form-control item-qty" placeholder="Qty (e.g. 1)" ${disabled} value="${escapePrescriptionHtml(item?.quantity)}">
             <input type="text" class="form-control item-unit" placeholder="Unit (e.g. pills)" ${disabled} value="${escapePrescriptionHtml(item?.unit)}">
-            <input type="time" class="form-control item-time" ${disabled} value="${escapePrescriptionHtml(item?.time_of_day)}">
+            <input type="time" class="form-control item-time" value="${escapePrescriptionHtml(item?.time_of_day)}">
             <select class="form-control item-event" style="grid-column: span 4;" ${disabled}>
                 <option value="Independent">Independent of Meal</option>
                 <option value="Before Meal">Before Meal</option>
