@@ -226,10 +226,21 @@
     <div class="card">
         <h3 class="card-title">Advanced Analytics</h3>
         <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;">
-            <button type="button" class="btn btn-primary" id="abnormalResultsMenuBtn">Abnormal Results</button>
+            <button type="button" class="btn btn-primary" id="abnormalResultsMenuBtn" onclick="showAdvancedAnalyticsView('list')">Abnormal Results</button>
+            <button type="button" class="btn btn-outline" id="abnormalResultsChartMenuBtn" onclick="showAdvancedAnalyticsView('chart')">Abnormal Results-Chart</button>
         </div>
         <div id="abnormalResultsPanel">
             <p class="text-muted">Loading lab results...</p>
+        </div>
+        <div id="abnormalResultsChartView" style="display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
+                <h4 style="margin:0;">Abnormal Results Trend</h4>
+                <select id="abnormalChartParamSelect" class="form-control" style="width: 260px;" onchange="renderAbnormalChart()">
+                    <option value="">Select an abnormal parameter...</option>
+                </select>
+            </div>
+            <p id="abnormalChartEmpty" class="text-muted" style="display:none;">No abnormal lab results to chart.</p>
+            <canvas id="abnormalChart" width="400" height="150"></canvas>
         </div>
     </div>
 </div>
@@ -572,6 +583,8 @@
     let globalLabsData = [];
     let labTrendParameters = [];
     let masterLabTests = [];
+    let abnormalChartParameters = [];
+    let abnormalChartInstance = null;
 
     function switchTab(tabId, btnElement) {
         const isDashboardHome = tabId === 'dashboardHome';
@@ -2334,6 +2347,7 @@
         select.value = String(selectedIndex >= 0 ? selectedIndex : (labTrendParameters.length ? 0 : ''));
         renderLabsChart();
         renderAbnormalResults();
+        populateAbnormalChartParameters();
     }
 
     function findParameterRange(testName, parameterName) {
@@ -2346,6 +2360,16 @@
         return { low: parameter?.low_range ?? null, high: parameter?.high_range ?? null };
     }
 
+    // Returns { status, low, high } when a reading is outside its range, otherwise null.
+    function getAbnormalStatus(report, parameter) {
+        const value = Number(parameter.value);
+        if (parameter.value === null || parameter.value === '' || Number.isNaN(value)) return null;
+        const { low, high } = findParameterRange(report.test_name, parameter.name);
+        const status = low !== null && value < low ? 'Low'
+            : (high !== null && value > high ? 'High' : null);
+        return status ? { status, low, high } : null;
+    }
+
     // Lists every report (not just the latest per test) with at least one out-of-range parameter.
     function renderAbnormalResults() {
         const panel = document.getElementById('abnormalResultsPanel');
@@ -2355,12 +2379,8 @@
         globalLabsData.forEach(report => {
             const abnormalParameters = [];
             report.parameters.forEach(parameter => {
-                const value = Number(parameter.value);
-                if (parameter.value === null || parameter.value === '' || Number.isNaN(value)) return;
-                const { low, high } = findParameterRange(report.test_name, parameter.name);
-                const status = low !== null && value < low ? 'Low'
-                    : (high !== null && value > high ? 'High' : null);
-                if (status) abnormalParameters.push({ parameter, status, low, high });
+                const abnormal = getAbnormalStatus(report, parameter);
+                if (abnormal) abnormalParameters.push({ parameter, ...abnormal });
             });
             if (abnormalParameters.length) abnormalReports.push({ report, abnormalParameters });
         });
@@ -2402,6 +2422,151 @@
                 </div>
             </div>
         `).join('');
+    }
+
+    function showAdvancedAnalyticsView(view) {
+        const isChart = view === 'chart';
+        document.getElementById('abnormalResultsPanel').style.display = isChart ? 'none' : '';
+        document.getElementById('abnormalResultsChartView').style.display = isChart ? '' : 'none';
+        document.getElementById('abnormalResultsMenuBtn').className = isChart ? 'btn btn-outline' : 'btn btn-primary';
+        document.getElementById('abnormalResultsChartMenuBtn').className = isChart ? 'btn btn-primary' : 'btn btn-outline';
+        if (isChart) renderAbnormalChart();
+    }
+
+    // Only parameters with at least one abnormal reading are offered in the abnormal chart dropdown.
+    function populateAbnormalChartParameters() {
+        const select = document.getElementById('abnormalChartParamSelect');
+        const previousKey = abnormalChartParameters[Number(select.value)]?.key ?? null;
+        const parameters = new Map();
+
+        globalLabsData.forEach(report => report.parameters.forEach(parameter => {
+            if (!getAbnormalStatus(report, parameter)) return;
+            const key = `${report.test_name.toLocaleLowerCase()}|${parameter.name.toLocaleLowerCase()}`;
+            if (!parameters.has(key)) {
+                parameters.set(key, { key, testName: report.test_name, parameterName: parameter.name });
+            }
+        }));
+
+        abnormalChartParameters = Array.from(parameters.values());
+        select.innerHTML = '<option value="">Select an abnormal parameter...</option>' +
+            abnormalChartParameters.map((parameter, index) =>
+                `<option value="${index}">${escapeHtml(parameter.testName)} — ${escapeHtml(parameter.parameterName)}</option>`
+            ).join('');
+
+        const selectedIndex = abnormalChartParameters.findIndex(parameter => parameter.key === previousKey);
+        select.value = String(selectedIndex >= 0 ? selectedIndex : (abnormalChartParameters.length ? 0 : ''));
+        renderAbnormalChart();
+    }
+
+    // Plots only the abnormal readings of the selected parameter, with date and time on the x-axis.
+    function renderAbnormalChart() {
+        const selectValue = document.getElementById('abnormalChartParamSelect').value;
+        const selected = selectValue === '' ? null : abnormalChartParameters[Number(selectValue)];
+        const canvas = document.getElementById('abnormalChart');
+        const emptyMessage = document.getElementById('abnormalChartEmpty');
+        const hasAbnormal = abnormalChartParameters.length > 0;
+
+        if (abnormalChartInstance) {
+            abnormalChartInstance.destroy();
+            abnormalChartInstance = null;
+        }
+
+        emptyMessage.style.display = hasAbnormal ? 'none' : '';
+        canvas.style.display = hasAbnormal ? '' : 'none';
+        if (!selected) return;
+
+        const points = [];
+        globalLabsData.forEach(report => {
+            if (report.test_name.toLocaleLowerCase() !== selected.testName.toLocaleLowerCase()) return;
+            const parameter = report.parameters.find(p =>
+                p.name.toLocaleLowerCase() === selected.parameterName.toLocaleLowerCase()
+            );
+            const abnormal = parameter && getAbnormalStatus(report, parameter);
+            if (abnormal) {
+                points.push({
+                    date: new Date(report.recorded_at),
+                    value: parameter.value,
+                    unit: parameter.unit,
+                    status: abnormal.status,
+                    low: abnormal.low,
+                    high: abnormal.high
+                });
+            }
+        });
+        if (!points.length) return;
+
+        points.sort((a, b) => a.date - b.date);
+
+        const { low, high } = findParameterRange(selected.testName, selected.parameterName);
+        const labels = points.map(p => p.date.toLocaleString([], {
+            month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        }));
+        const pointColors = points.map(p => p.status === 'High' ? '#d62828' : '#3a86ff');
+        const unitSuffix = points[0].unit ? ` (${points[0].unit})` : '';
+        const datasets = [{
+            label: `${selected.parameterName}${unitSuffix} - abnormal`,
+            data: points.map(p => p.value),
+            showLine: false,
+            pointRadius: 6,
+            pointHoverRadius: 8,
+            pointBackgroundColor: pointColors,
+            pointBorderColor: pointColors
+        }];
+        if (low !== null) {
+            datasets.push({
+                label: 'Reference Range LOW',
+                data: labels.map(() => low),
+                borderColor: '#e76f51',
+                backgroundColor: '#e76f51',
+                borderDash: [6, 4],
+                borderWidth: 2,
+                pointRadius: 0,
+                pointHoverRadius: 0,
+                fill: false,
+                tension: 0
+            });
+        }
+        if (high !== null) {
+            datasets.push({
+                label: 'Reference Range HIGH',
+                data: labels.map(() => high),
+                borderColor: '#2a9d8f',
+                backgroundColor: '#2a9d8f',
+                borderDash: [6, 4],
+                borderWidth: 2,
+                pointRadius: 0,
+                pointHoverRadius: 0,
+                fill: false,
+                tension: 0
+            });
+        }
+
+        abnormalChartInstance = new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: { labels, datasets },
+            options: {
+                responsive: true,
+                interaction: { mode: 'nearest', intersect: true },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: context => {
+                                if (context.datasetIndex !== 0) {
+                                    return `${context.dataset.label}: ${context.parsed.y}`;
+                                }
+                                const point = points[context.dataIndex];
+                                const unit = point.unit ? ` ${point.unit}` : '';
+                                const range = `range ${point.low ?? '—'} to ${point.high ?? '—'}`;
+                                return `${point.status}: ${point.value}${unit} (${range})`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: { beginAtZero: false }
+                }
+            }
+        });
     }
 
     function showLabTrendForParameter(testName, parameterName) {
