@@ -454,15 +454,14 @@
             </div>
             <div class="form-group" id="interventionDiagnosisContainer" style="display:none;">
                 <label class="form-label" for="interventionDiagnosis">Diagnosis</label>
-                <select id="interventionDiagnosis" class="form-control">
-                    <option value="">Select or type diagnosis...</option>
-                    <option value="Hypertension">Hypertension</option>
-                    <option value="Diabetes">Diabetes</option>
-                    <option value="Kidney Disease">Kidney Disease</option>
-                    <option value="Heart Disease">Heart Disease</option>
-                    <option value="Thyroid">Thyroid</option>
-                    <option value="Other">Other (specify in notes)</option>
-                </select>
+                <input type="text" id="interventionDiagnosis" class="form-control" list="interventionDiagnosisOptions" placeholder="Type a diagnosis..." autocomplete="off">
+                <datalist id="interventionDiagnosisOptions">
+                    <option value="Hypertension"></option>
+                    <option value="Diabetes"></option>
+                    <option value="Kidney Disease"></option>
+                    <option value="Heart Disease"></option>
+                    <option value="Thyroid"></option>
+                </datalist>
             </div>
             <div id="interventionMedicationFields" style="display:none;">
                 <div class="form-group">
