@@ -527,6 +527,16 @@
     </div>
 </div>
 
+<div id="interventionViewModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1002; overflow-y:auto;">
+    <div class="card" style="max-width:600px; margin:5% auto;">
+        <h3 class="card-title">Intervention Details</h3>
+        <div id="interventionViewContent" style="max-height:60vh; overflow-y:auto; padding-right:0.5rem;"></div>
+        <div style="display:flex; justify-content:flex-end; margin-top:1.5rem;">
+            <button type="button" class="btn btn-outline" onclick="closeInterventionView()">Close</button>
+        </div>
+    </div>
+</div>
+
 <div id="prescriptionViewModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
     <div class="card" style="max-width:700px; margin:5% auto;">
         <h3 class="card-title">Prescription Details</h3>
@@ -887,7 +897,12 @@
     function viewIntervention(id) {
         const intervention = interventionsById.get(id);
         if (!intervention) return;
-        alert(`Intervention Details:\n\n${interventionPlanDetails(intervention).replace(/<[^>]*>/g, '\n').trim()}`);
+        document.getElementById('interventionViewContent').innerHTML = interventionPlanDetails(intervention);
+        document.getElementById('interventionViewModal').style.display = 'block';
+    }
+
+    function closeInterventionView() {
+        document.getElementById('interventionViewModal').style.display = 'none';
     }
 
     function editIntervention(id) {
