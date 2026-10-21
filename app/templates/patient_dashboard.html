@@ -2505,7 +2505,11 @@
         const datasets = [{
             label: `${selected.parameterName}${unitSuffix} - abnormal`,
             data: points.map(p => p.value),
-            showLine: false,
+            borderColor: '#9d4edd',
+            backgroundColor: 'rgba(157, 78, 221, 0.2)',
+            showLine: true,
+            tension: 0.3,
+            fill: false,
             pointRadius: 6,
             pointHoverRadius: 8,
             pointBackgroundColor: pointColors,
