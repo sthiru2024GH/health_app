@@ -329,6 +329,9 @@ def close_intervention(intervention_id):
     if not plan or plan.patient_id != session['user_id']:
         return jsonify({'error': 'Intervention not found'}), 404
 
+    if plan.status == 'closed':
+        return jsonify({'message': 'Intervention is already closed'}), 200
+
     plan.status = 'closed'
     db.session.commit()
     return jsonify({'message': 'Intervention closed'}), 200

@@ -112,7 +112,7 @@
             <label class="form-label" for="interventionMethod" style="margin-bottom:0.25rem;">Add Interventions</label>
             <select id="interventionMethod" class="form-control" aria-label="Add Interventions method" onchange="openInterventionForm(this.value)">
                 <option value="">Select method...</option>
-                <option value="medication">Medication</option>
+                <option value="medications">Medications</option>
                 <option value="surgery">Surgery</option>
                 <option value="procedure">Procedure</option>
                 <option value="others">Others</option>
@@ -694,7 +694,7 @@
     function closeInterventionForm() {
         document.getElementById('interventionModal').style.display = 'none';
         document.getElementById('interventionForm').reset();
-        document.getElementById('interventionMethod').value = '';
+        document.getElementById('interventionId').value = '';
         // Set default date/time to now
         setCurrentInterventionDateTime();
     }
@@ -736,7 +736,7 @@
             practitioner_id: document.getElementById('interventionPractitioner').value,
             symptom_id: document.getElementById('interventionSymptom').value,
             method,
-            intervention_date: interventionDate,
+            intervention_date: localDateTimeToUtcIso(interventionDate),
             notes: document.getElementById('interventionNotes').value,
             diagnosis: document.getElementById('interventionDiagnosis').value || null
         };
@@ -768,6 +768,7 @@
         } catch (err) {
             error.textContent = err.message || 'Unable to save intervention. Please try again.';
             error.style.display = 'block';
+        } finally {
             submitButton.disabled = false;
             submitButton.textContent = 'Save Intervention';
             cancelButton.disabled = false;
@@ -808,15 +809,17 @@
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'Unable to load interventions');
 
+            // Force-closed interventions are kept in the database but hidden from the list
+            const activeInterventions = data.interventions.filter(plan => plan.status !== 'closed');
             interventionsById.clear();
-            data.interventions.forEach(plan => interventionsById.set(plan.id, plan));
-            if (!data.interventions.length) {
+            activeInterventions.forEach(plan => interventionsById.set(plan.id, plan));
+            if (!activeInterventions.length) {
                 list.innerHTML = '<p class="text-muted">No interventions recorded.</p>';
                 return;
             }
 
             // Sort interventions by created_at (newest first)
-            const sortedInterventions = [...data.interventions].sort((a, b) => {
+            const sortedInterventions = [...activeInterventions].sort((a, b) => {
                 const dateA = new Date(a.created_at || 0);
                 const dateB = new Date(b.created_at || 0);
                 return dateB - dateA;
@@ -854,6 +857,11 @@
         const date = new Date(value);
         date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
         return date.toISOString().slice(0, 16);
+    }
+
+    // Converts a datetime-local value (browser local time) to a UTC ISO string with offset
+    function localDateTimeToUtcIso(value) {
+        return value ? new Date(value).toISOString().replace('Z', '+00:00') : null;
     }
 
     function openInterventionLogForm(interventionId, log = null) {
@@ -925,7 +933,8 @@
             });
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'Unable to close intervention');
-            
+
+            interventionsById.delete(id);
             await loadInterventions();
         } catch (error) {
             console.error('Failed to close intervention:', error);
@@ -937,7 +946,7 @@
         event.preventDefault();
         if (!activeInterventionId) return;
         const payload = {
-            administered_at: document.getElementById('interventionAdministeredAt').value,
+            administered_at: localDateTimeToUtcIso(document.getElementById('interventionAdministeredAt').value),
             notes: document.getElementById('interventionLogNotes').value
         };
         const isEditing = editingInterventionLogId !== null;

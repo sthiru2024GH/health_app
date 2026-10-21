@@ -300,7 +300,10 @@ def migrate_legacy_schema(engine, logger):
                 connection.execute(text(
                     f"ALTER TABLE interventions ADD COLUMN intervention_date {column_type}"
                 ))
-        if "vital_signs" in tables:
+            # Method 'medication' was renamed to 'medications'
+            connection.execute(text(
+                "UPDATE interventions SET method = 'medications' WHERE method = 'medication'"
+            ))
             columns = {
                 column["name"] for column in inspector.get_columns("vital_signs")
             }
