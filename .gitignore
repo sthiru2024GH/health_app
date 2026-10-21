@@ -4,3 +4,14 @@ venv/
 instance/
 __pycache__/
 .env
+
+# Local admin/maintenance helper scripts (not part of the app)
+activate_legacy_account.py
+clean_vitals.py
+create_guest_account.py
+migrate_legacy_medications.py
+seed_db.py
+
+# Local session/cookie exports
+cookies.txt
+_tmp_check.js
