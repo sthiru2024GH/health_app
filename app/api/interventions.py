@@ -173,6 +173,98 @@ def create_intervention():
     return jsonify({'message': 'Intervention saved', 'id': plan.id}), 201
 
 
+@interventions_bp.route('/<int:intervention_id>', methods=['PUT'])
+@require_role('patient')
+def update_intervention(intervention_id):
+    plan = db.session.get(Intervention, intervention_id)
+    if not plan or plan.patient_id != session['user_id']:
+        return jsonify({'error': 'Intervention not found'}), 404
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'error': 'A valid intervention is required'}), 400
+
+    method = data.get('method')
+    notes = data.get('notes', '')
+    if not isinstance(method, str) or method not in METHODS:
+        return jsonify({'error': 'Select a valid intervention method'}), 400
+    if not isinstance(notes, str):
+        return jsonify({'error': 'Notes must be text'}), 400
+    notes = notes.strip()
+    if method == 'others' and not notes:
+        return jsonify({'error': 'Notes are required for other interventions'}), 400
+
+    try:
+        practitioner_id = int(data.get('practitioner_id'))
+        symptom_id = int(data.get('symptom_id'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Select a practitioner and symptom'}), 400
+
+    practitioner = db.session.get(Practitioner, practitioner_id)
+    symptom = db.session.get(SymptomEntry, symptom_id)
+    if not practitioner or practitioner.patient_id != plan.patient_id:
+        return jsonify({'error': 'Select one of your practitioners'}), 400
+    if not symptom or symptom.patient_id != plan.patient_id:
+        return jsonify({'error': 'Select one of your recorded symptoms'}), 400
+
+    intervention_date_value = data.get('intervention_date')
+    intervention_date = None
+    if intervention_date_value:
+        try:
+            intervention_date = datetime.fromisoformat(intervention_date_value.replace('T', ' '))
+            if intervention_date.tzinfo is None:
+                intervention_date = intervention_date.replace(tzinfo=timezone.utc)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'Enter a valid intervention date and time'}), 400
+
+    plan.practitioner_id = practitioner_id
+    plan.symptom_id = symptom_id
+    plan.method = method
+    plan.diagnosis = data.get('diagnosis') or None
+    plan.intervention_date = intervention_date
+    plan.notes = notes
+
+    if method == 'medications':
+        medication_type = data.get('medication_type')
+        drug_name = data.get('drug_name')
+        if not isinstance(medication_type, str) or medication_type not in MEDICATION_TYPES:
+            return jsonify({'error': 'Select one-time or periodic medication'}), 400
+        if not isinstance(drug_name, str) or not drug_name.strip():
+            return jsonify({'error': 'Drug name is required for medication interventions'}), 400
+        plan.medication_type = medication_type
+        plan.drug_name = drug_name.strip()
+
+        if medication_type == 'periodic':
+            try:
+                frequency_count = int(data.get('frequency_count'))
+            except (TypeError, ValueError):
+                return jsonify({'error': 'Enter a valid medication frequency'}), 400
+            frequency_unit = data.get('frequency_unit')
+            if (
+                frequency_count < 1
+                or not isinstance(frequency_unit, str)
+                or frequency_unit not in FREQUENCY_UNITS
+            ):
+                return jsonify({'error': 'Frequency must be positive and use days, weeks, or months'}), 400
+            plan.frequency_count = frequency_count
+            plan.frequency_unit = frequency_unit
+            end_date_value = data.get('end_date')
+            if end_date_value:
+                try:
+                    plan.end_date = date.fromisoformat(end_date_value)
+                except (TypeError, ValueError):
+                    return jsonify({'error': 'Enter a valid intervention end date'}), 400
+    else:
+        plan.medication_type = None
+        plan.drug_name = None
+        plan.frequency_count = None
+        plan.frequency_unit = None
+        plan.end_date = None
+
+    db.session.commit()
+    return jsonify({'message': 'Intervention updated', 'id': plan.id}), 200
+
+
 @interventions_bp.route('/<int:intervention_id>/logs', methods=['POST'])
 @require_role('patient')
 def create_intervention_log(intervention_id):

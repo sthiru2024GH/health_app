@@ -411,9 +411,10 @@
 
 <div id="interventionModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
     <div class="card guest-write-control" style="max-width:600px; margin:5% auto;">
-        <h3 class="card-title">Add Intervention</h3>
+        <h3 class="card-title" id="interventionModalTitle">Add Intervention</h3>
         <div id="interventionFormError" role="alert" style="display:none; color:var(--danger-color); margin-bottom:1rem;"></div>
         <form id="interventionForm">
+            <input type="hidden" id="interventionId">
             <div class="form-group">
                 <label class="form-label" for="interventionPractitioner">Practitioner</label>
                 <select id="interventionPractitioner" class="form-control" required>
@@ -681,8 +682,10 @@
         if (!method) return;
         const form = document.getElementById('interventionForm');
         form.reset();
+        document.getElementById('interventionId').value = '';
         document.getElementById('interventionMethodType').value = method;
         document.getElementById('interventionFormError').style.display = 'none';
+        document.getElementById('interventionModalTitle').textContent = 'Add Intervention';
         setCurrentInterventionDateTime();
         updateInterventionFields();
         document.getElementById('interventionModal').style.display = 'block';
@@ -728,6 +731,7 @@
         const method = document.getElementById('interventionMethodType').value;
         const medicationType = document.getElementById('interventionMedicationType').value;
         const interventionDate = document.getElementById('interventionDate').value;
+        const interventionId = document.getElementById('interventionId').value;
         const payload = {
             practitioner_id: document.getElementById('interventionPractitioner').value,
             symptom_id: document.getElementById('interventionSymptom').value,
@@ -749,8 +753,10 @@
         const error = document.getElementById('interventionFormError');
         error.style.display = 'none';
         try {
-            const response = await fetch('/api/interventions', {
-                method: 'POST',
+            const endpoint = interventionId ? `/api/interventions/${interventionId}` : '/api/interventions';
+            const httpMethod = interventionId ? 'PUT' : 'POST';
+            const response = await fetch(endpoint, {
+                method: httpMethod,
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(payload)
             });
@@ -880,6 +886,7 @@
         const intervention = interventionsById.get(id);
         if (!intervention) return;
         
+        document.getElementById('interventionId').value = id;
         document.getElementById('interventionPractitioner').value = intervention.practitioner_id || '';
         document.getElementById('interventionSymptom').value = intervention.symptom_id || '';
         document.getElementById('interventionMethodType').value = intervention.method || '';
@@ -887,6 +894,7 @@
             ? toDateTimeLocal(intervention.intervention_date) 
             : '';
         document.getElementById('interventionDiagnosis').value = intervention.diagnosis || '';
+        document.getElementById('interventionModalTitle').textContent = 'Edit Intervention';
         updateInterventionFields();
         
         if (intervention.method === 'medications') {
